@@ -1,0 +1,21 @@
+{
+  "name": "comparex-front-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Comparex front API service",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js"
+  },
+  "engines": {
+    "node": ">=16"
+  },
+  "dependencies": {
+    "express": "^4.22.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}
