@@ -283,6 +283,172 @@
           "response": []
         }
       ]
+    },
+    {
+      "name": "Support",
+      "item": [
+        {
+          "name": "Get Form Options",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/support/form-options",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "support", "form-options"]
+            },
+            "description": "Returns merchant support desk form fields, payment gateway options, and issue categories."
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Support Request",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "businessName",
+                  "value": "Acme Store",
+                  "type": "text"
+                },
+                {
+                  "key": "contactNumber",
+                  "value": "9876543210",
+                  "type": "text"
+                },
+                {
+                  "key": "businessEmail",
+                  "value": "merchant@example.com",
+                  "type": "text"
+                },
+                {
+                  "key": "website",
+                  "value": "https://example.com",
+                  "type": "text"
+                },
+                {
+                  "key": "paymentGateway",
+                  "value": "Razorpay",
+                  "type": "text"
+                },
+                {
+                  "key": "issueCategory",
+                  "value": "Onboarding Delay",
+                  "type": "text"
+                },
+                {
+                  "key": "issueDescription",
+                  "value": "My onboarding has been pending for 2 weeks.",
+                  "type": "text"
+                },
+                {
+                  "key": "disclaimerAccepted",
+                  "value": "true",
+                  "type": "text"
+                },
+                {
+                  "key": "attachments",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/support",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "support"]
+            },
+            "description": "Submit merchant support desk form. Optional attachments uploaded to S3 (field: attachments, max 5 files)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Upload",
+      "item": [
+        {
+          "name": "Upload Single File",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "folder",
+                  "value": "uploads",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/upload",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "upload"]
+            },
+            "description": "Upload a single file to S3. Requires Bearer token. Form field: file."
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Multiple Files",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "files",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "folder",
+                  "value": "uploads",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/upload/multiple",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "upload", "multiple"]
+            },
+            "description": "Upload up to 5 files to S3. Requires Bearer token. Form field: files."
+          },
+          "response": []
+        }
+      ]
     }
   ]
 }

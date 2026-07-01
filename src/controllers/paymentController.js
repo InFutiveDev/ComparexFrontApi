@@ -5,12 +5,7 @@ import {
   PAYMENT_PARTNERSHIP_GOALS,
 } from "../constants/paymentForm.js";
 import { PaymentProvider } from "../models/PaymentProvider.js";
-
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-function normalizePhone(phone) {
-  return phone.replace(/\s+/g, "").trim();
-}
+import { getPhoneDigits, validateEmail, validateMobilePhone } from "../utils/validation.js";
 
 export function getFormOptions(_req, res) {
   return res.json({
@@ -63,8 +58,14 @@ export async function submitPaymentForm(req, res) {
       });
     }
 
-    if (!EMAIL_PATTERN.test(email.trim())) {
-      return res.status(400).json({ message: "A valid email address is required" });
+    const emailError = validateEmail(email);
+    if (emailError) {
+      return res.status(400).json({ message: emailError });
+    }
+
+    const phoneError = validateMobilePhone(phone);
+    if (phoneError) {
+      return res.status(400).json({ message: phoneError });
     }
 
     if (!Array.isArray(paymentCapabilities) || paymentCapabilities.length === 0) {
@@ -98,7 +99,7 @@ export async function submitPaymentForm(req, res) {
       contactPerson: contactPerson.trim(),
       designation: designation.trim(),
       email: email.trim().toLowerCase(),
-      phone: normalizePhone(phone),
+      phone: getPhoneDigits(phone),
       website: website?.trim() || "",
       paymentCapabilities,
       partnershipGoals,
