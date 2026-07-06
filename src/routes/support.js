@@ -1,9 +1,11 @@
 import { Router } from "express";
 import {
+  getAllMerchantSupport,
   getSupportFormOptions,
   submitSupportRequest,
 } from "../controllers/supportController.js";
 import { handleUploadError } from "../controllers/uploadController.js";
+import { authMiddleware } from "../middleware/auth.js";
 import { uploadSupportAttachments } from "../middleware/upload.js";
 
 const router = Router();
@@ -21,6 +23,7 @@ function runUpload(middleware) {
 }
 
 router.get("/form-options", getSupportFormOptions);
+router.get("/", authMiddleware, getAllMerchantSupport);
 router.post("/", runUpload(uploadSupportAttachments), submitSupportRequest);
 
 export { router as supportRouter };

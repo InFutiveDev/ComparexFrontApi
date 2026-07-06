@@ -48,6 +48,23 @@ export function getSupportFormOptions(_req, res) {
   });
 }
 
+export async function getAllMerchantSupport(req, res) {
+  try {
+    const { page, limit } = req.query;
+    const result = await SupportRequest.findAll({ page, limit });
+
+    return res.json({
+      merchantSupport: result.items.map(SupportRequest.sanitize),
+      total: result.total,
+      page: result.page,
+      limit: result.limit,
+    });
+  } catch (error) {
+    console.error("Get merchant support error:", error);
+    return res.status(500).json({ message: "Failed to fetch merchant support requests" });
+  }
+}
+
 export async function submitSupportRequest(req, res) {
   try {
     const businessName = getField(req.body, "businessName");

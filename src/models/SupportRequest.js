@@ -19,6 +19,24 @@ export const SupportRequest = {
     return { ...doc, _id: result.insertedId };
   },
 
+  async findAll({ page = 1, limit = 50 } = {}) {
+    const safePage = Math.max(1, Number(page) || 1);
+    const safeLimit = Math.min(100, Math.max(1, Number(limit) || 50));
+    const skip = (safePage - 1) * safeLimit;
+
+    const [items, total] = await Promise.all([
+      requests()
+        .find({})
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(safeLimit)
+        .toArray(),
+      requests().countDocuments({}),
+    ]);
+
+    return { items, total, page: safePage, limit: safeLimit };
+  },
+
   sanitize(request) {
     return {
       id: request._id.toString(),
@@ -31,6 +49,7 @@ export const SupportRequest = {
       issueDescription: request.issueDescription,
       disclaimerAccepted: request.disclaimerAccepted,
       attachments: request.attachments ?? [],
+      source: request.source ?? null,
       createdAt: request.createdAt,
     };
   },

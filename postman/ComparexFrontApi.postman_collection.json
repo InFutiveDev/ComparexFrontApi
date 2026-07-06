@@ -481,7 +481,7 @@
       ]
     },
     {
-      "name": "Support",
+      "name": "Merchant Support",
       "item": [
         {
           "name": "Get Form Options",
@@ -494,6 +494,40 @@
               "path": ["api", "support", "form-options"]
             },
             "description": "Returns merchant support desk form fields, payment gateway options, and issue categories."
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Merchant Support",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/support?page=1&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "support"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "50"
+                }
+              ]
+            },
+            "description": "Returns all merchant support desk submissions. Requires Bearer token. Supports page and limit query params."
           },
           "response": []
         },
