@@ -17,6 +17,10 @@
     {
       "key": "refreshToken",
       "value": ""
+    },
+    {
+      "key": "id",
+      "value": ""
     }
   ],
   "item": [
@@ -315,6 +319,30 @@
             "description": "Submit the merchant lead form from /merchant page. Accepts `priority` or `business` for step 3."
           },
           "response": []
+        },
+        {
+          "name": "Delete Merchant Gateway",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/merchant/{{id}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "merchant", "{{id}}"]
+            },
+            "description": "Delete a merchant gateway lead by id. Set `id` from Get All Merchant Gateways response."
+          },
+          "response": []
         }
       ]
     },
@@ -396,6 +424,30 @@
             "description": "Submit the payment gateway partnership inquiry form."
           },
           "response": []
+        },
+        {
+          "name": "Delete Payment Gateway",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/payment/{{id}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payment", "{{id}}"]
+            },
+            "description": "Delete a payment gateway record by id. Set `id` from Get All Payment Gateways response."
+          },
+          "response": []
         }
       ]
     },
@@ -475,6 +527,30 @@
               "path": ["api", "reseller"]
             },
             "description": "Submit the reseller partner application form."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Reseller",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reseller/{{id}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "reseller", "{{id}}"]
+            },
+            "description": "Delete a reseller partner record by id. Set `id` from Get All Resellers response."
           },
           "response": []
         }
@@ -592,6 +668,30 @@
               "path": ["api", "support"]
             },
             "description": "Submit merchant support desk form. Optional attachments uploaded to S3 (field: attachments, max 5 files)."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Merchant Support",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/support/{{id}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "support", "{{id}}"]
+            },
+            "description": "Delete a merchant support request by id. Set `id` from Get All Merchant Support response."
           },
           "response": []
         }

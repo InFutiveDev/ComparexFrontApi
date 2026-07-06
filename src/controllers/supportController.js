@@ -65,6 +65,25 @@ export async function getAllMerchantSupport(req, res) {
   }
 }
 
+export async function deleteMerchantSupport(req, res) {
+  try {
+    const result = await SupportRequest.deleteById(req.params.id);
+
+    if (result.invalid) {
+      return res.status(400).json({ message: "Invalid merchant support id" });
+    }
+
+    if (!result.deleted) {
+      return res.status(404).json({ message: "Merchant support request not found" });
+    }
+
+    return res.json({ message: "Merchant support request deleted successfully" });
+  } catch (error) {
+    console.error("Delete merchant support error:", error);
+    return res.status(500).json({ message: "Failed to delete merchant support request" });
+  }
+}
+
 export async function submitSupportRequest(req, res) {
   try {
     const businessName = getField(req.body, "businessName");

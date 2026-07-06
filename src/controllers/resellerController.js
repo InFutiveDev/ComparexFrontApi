@@ -55,6 +55,25 @@ export async function getAllResellers(req, res) {
   }
 }
 
+export async function deleteReseller(req, res) {
+  try {
+    const result = await ResellerPartner.deleteById(req.params.id);
+
+    if (result.invalid) {
+      return res.status(400).json({ message: "Invalid reseller id" });
+    }
+
+    if (!result.deleted) {
+      return res.status(404).json({ message: "Reseller not found" });
+    }
+
+    return res.json({ message: "Reseller deleted successfully" });
+  } catch (error) {
+    console.error("Delete reseller error:", error);
+    return res.status(500).json({ message: "Failed to delete reseller" });
+  }
+}
+
 export async function submitResellerForm(req, res) {
   try {
     const {

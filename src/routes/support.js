@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  deleteMerchantSupport,
   getAllMerchantSupport,
   getSupportFormOptions,
   submitSupportRequest,
@@ -25,5 +26,6 @@ function runUpload(middleware) {
 router.get("/form-options", getSupportFormOptions);
 router.get("/", authMiddleware, getAllMerchantSupport);
 router.post("/", runUpload(uploadSupportAttachments), submitSupportRequest);
+router.delete("/:id", authMiddleware, deleteMerchantSupport);
 
 export { router as supportRouter };

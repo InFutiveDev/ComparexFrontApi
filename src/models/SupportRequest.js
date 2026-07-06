@@ -1,4 +1,5 @@
 import { getDb } from "../mongo.js";
+import { parseObjectId } from "../utils/objectId.js";
 
 const COLLECTION = "support_requests";
 
@@ -35,6 +36,16 @@ export const SupportRequest = {
     ]);
 
     return { items, total, page: safePage, limit: safeLimit };
+  },
+
+  async deleteById(id) {
+    const objectId = parseObjectId(id);
+    if (!objectId) {
+      return { invalid: true, deleted: false };
+    }
+
+    const result = await requests().deleteOne({ _id: objectId });
+    return { invalid: false, deleted: result.deletedCount > 0 };
   },
 
   sanitize(request) {

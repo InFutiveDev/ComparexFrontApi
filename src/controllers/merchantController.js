@@ -49,6 +49,25 @@ export async function getAllMerchantGateways(req, res) {
   }
 }
 
+export async function deleteMerchantGateway(req, res) {
+  try {
+    const result = await MerchantLead.deleteById(req.params.id);
+
+    if (result.invalid) {
+      return res.status(400).json({ message: "Invalid merchant gateway id" });
+    }
+
+    if (!result.deleted) {
+      return res.status(404).json({ message: "Merchant gateway not found" });
+    }
+
+    return res.json({ message: "Merchant gateway deleted successfully" });
+  } catch (error) {
+    console.error("Delete merchant gateway error:", error);
+    return res.status(500).json({ message: "Failed to delete merchant gateway" });
+  }
+}
+
 export async function submitMerchantForm(req, res) {
   try {
     const { businessName, email, phone, industry } = req.body;

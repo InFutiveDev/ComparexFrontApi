@@ -49,6 +49,25 @@ export async function getAllPaymentGateways(req, res) {
   }
 }
 
+export async function deletePaymentGateway(req, res) {
+  try {
+    const result = await PaymentProvider.deleteById(req.params.id);
+
+    if (result.invalid) {
+      return res.status(400).json({ message: "Invalid payment gateway id" });
+    }
+
+    if (!result.deleted) {
+      return res.status(404).json({ message: "Payment gateway not found" });
+    }
+
+    return res.json({ message: "Payment gateway deleted successfully" });
+  } catch (error) {
+    console.error("Delete payment gateway error:", error);
+    return res.status(500).json({ message: "Failed to delete payment gateway" });
+  }
+}
+
 export async function submitPaymentForm(req, res) {
   try {
     const {
