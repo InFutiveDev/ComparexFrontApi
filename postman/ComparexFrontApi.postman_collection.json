@@ -238,7 +238,7 @@
       ]
     },
     {
-      "name": "Merchant",
+      "name": "Merchant Gateway",
       "item": [
         {
           "name": "Get Form Options",
@@ -250,12 +250,46 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "merchant", "form-options"]
             },
-            "description": "Returns merchant form steps, industry options, and priority options."
+            "description": "Returns merchant gateway form steps, industry options, and priority options."
           },
           "response": []
         },
         {
-          "name": "Submit Merchant Form",
+          "name": "Get All Merchant Gateways",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/merchant?page=1&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "merchant"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "50"
+                }
+              ]
+            },
+            "description": "Returns all merchant gateway lead submissions. Requires Bearer token. Supports page and limit query params."
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Merchant Gateway Form",
           "request": {
             "method": "POST",
             "header": [
@@ -279,6 +313,168 @@
               "path": ["api", "merchant"]
             },
             "description": "Submit the merchant lead form from /merchant page. Accepts `priority` or `business` for step 3."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Payment Gateway",
+      "item": [
+        {
+          "name": "Get Form Options",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/payment/form-options",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payment", "form-options"]
+            },
+            "description": "Returns payment gateway partnership form steps and field options."
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Payment Gateways",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/payment?page=1&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payment"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "50"
+                }
+              ]
+            },
+            "description": "Returns all payment gateway partnership submissions. Requires Bearer token. Supports page and limit query params."
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Payment Gateway Form",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"companyName\": \"PayCo Solutions\",\n  \"contactPerson\": \"Jane Smith\",\n  \"designation\": \"Partnerships Lead\",\n  \"email\": \"partner@payco.com\",\n  \"phone\": \"9876543210\",\n  \"website\": \"https://payco.com\",\n  \"paymentCapabilities\": [\"online-payment\", \"upi\"],\n  \"partnershipGoals\": [\"visibility\", \"connect-segments\"],\n  \"consent\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/payment",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payment"]
+            },
+            "description": "Submit the payment gateway partnership inquiry form."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Reseller",
+      "item": [
+        {
+          "name": "Get Form Options",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reseller/form-options",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "reseller", "form-options"]
+            },
+            "description": "Returns reseller partner form steps and field options."
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Resellers",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reseller?page=1&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "reseller"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "50"
+                }
+              ]
+            },
+            "description": "Returns all reseller partner submissions. Requires Bearer token. Supports page and limit query params."
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Reseller Form",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"John Doe\",\n  \"businessName\": \"Partner Agency\",\n  \"phone\": \"9876543210\",\n  \"email\": \"partner@example.com\",\n  \"website\": \"https://example.com\",\n  \"partnerType\": \"consultant-advisor\",\n  \"businessTypes\": [\"ecommerce-d2c\", \"saas-technology\"],\n  \"monthlyBusinessCount\": \"6-10\",\n  \"paymentFamiliarity\": \"experienced\",\n  \"consent\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/reseller",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "reseller"]
+            },
+            "description": "Submit the reseller partner application form."
           },
           "response": []
         }

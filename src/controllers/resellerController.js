@@ -38,6 +38,23 @@ export function getFormOptions(_req, res) {
   });
 }
 
+export async function getAllResellers(req, res) {
+  try {
+    const { page, limit } = req.query;
+    const result = await ResellerPartner.findAll({ page, limit });
+
+    return res.json({
+      resellers: result.items.map(ResellerPartner.sanitize),
+      total: result.total,
+      page: result.page,
+      limit: result.limit,
+    });
+  } catch (error) {
+    console.error("Get resellers error:", error);
+    return res.status(500).json({ message: "Failed to fetch resellers" });
+  }
+}
+
 export async function submitResellerForm(req, res) {
   try {
     const {

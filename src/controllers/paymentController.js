@@ -32,6 +32,23 @@ export function getFormOptions(_req, res) {
   });
 }
 
+export async function getAllPaymentGateways(req, res) {
+  try {
+    const { page, limit } = req.query;
+    const result = await PaymentProvider.findAll({ page, limit });
+
+    return res.json({
+      paymentGateways: result.items.map(PaymentProvider.sanitize),
+      total: result.total,
+      page: result.page,
+      limit: result.limit,
+    });
+  } catch (error) {
+    console.error("Get payment gateways error:", error);
+    return res.status(500).json({ message: "Failed to fetch payment gateways" });
+  }
+}
+
 export async function submitPaymentForm(req, res) {
   try {
     const {

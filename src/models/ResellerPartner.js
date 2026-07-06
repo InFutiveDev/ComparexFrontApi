@@ -19,6 +19,24 @@ export const ResellerPartner = {
     return { ...doc, _id: result.insertedId };
   },
 
+  async findAll({ page = 1, limit = 50 } = {}) {
+    const safePage = Math.max(1, Number(page) || 1);
+    const safeLimit = Math.min(100, Math.max(1, Number(limit) || 50));
+    const skip = (safePage - 1) * safeLimit;
+
+    const [items, total] = await Promise.all([
+      partners()
+        .find({})
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(safeLimit)
+        .toArray(),
+      partners().countDocuments({}),
+    ]);
+
+    return { items, total, page: safePage, limit: safeLimit };
+  },
+
   sanitize(partner) {
     return {
       id: partner._id.toString(),
@@ -31,6 +49,8 @@ export const ResellerPartner = {
       businessTypes: partner.businessTypes,
       monthlyBusinessCount: partner.monthlyBusinessCount,
       paymentFamiliarity: partner.paymentFamiliarity,
+      consent: partner.consent ?? false,
+      source: partner.source ?? null,
       createdAt: partner.createdAt,
     };
   },

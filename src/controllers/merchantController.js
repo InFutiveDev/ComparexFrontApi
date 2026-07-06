@@ -32,6 +32,23 @@ export function getFormOptions(_req, res) {
   });
 }
 
+export async function getAllMerchantGateways(req, res) {
+  try {
+    const { page, limit } = req.query;
+    const result = await MerchantLead.findAll({ page, limit });
+
+    return res.json({
+      merchantGateways: result.items.map(MerchantLead.sanitize),
+      total: result.total,
+      page: result.page,
+      limit: result.limit,
+    });
+  } catch (error) {
+    console.error("Get merchant gateways error:", error);
+    return res.status(500).json({ message: "Failed to fetch merchant gateways" });
+  }
+}
+
 export async function submitMerchantForm(req, res) {
   try {
     const { businessName, email, phone, industry } = req.body;
