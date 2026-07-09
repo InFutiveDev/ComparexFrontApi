@@ -73,8 +73,7 @@ export async function deleteMerchantGateway(req, res) {
 
 export async function submitMerchantForm(req, res) {
   try {
-    const { businessName, email, phone, industry, password } = req.body;
-    const priority = req.body.priority ?? req.body.business;
+    const { businessName, email, phone, password } = req.body;
 
     if (!businessName?.trim() || !email?.trim() || !phone?.trim() || !password) {
       return res.status(400).json({
@@ -92,22 +91,6 @@ export async function submitMerchantForm(req, res) {
       return res.status(400).json({ message: phoneError });
     }
 
-    if (!industry) {
-      return res.status(400).json({ message: "Industry is required" });
-    }
-
-    if (!priority) {
-      return res.status(400).json({ message: "Priority is required" });
-    }
-
-    if (!MERCHANT_INDUSTRY_VALUES.includes(industry)) {
-      return res.status(400).json({ message: "Invalid industry value" });
-    }
-
-    if (!MERCHANT_PRIORITY_VALUES.includes(priority)) {
-      return res.status(400).json({ message: "Invalid priority value" });
-    }
-
     const userResult = await createUserFromForm({
       name: businessName.trim(),
       email,
@@ -123,23 +106,114 @@ export async function submitMerchantForm(req, res) {
       businessName: businessName.trim(),
       email: email.trim().toLowerCase(),
       phone: getPhoneDigits(phone),
-      industry,
-      priority,
+      industry: null,
+      priority: null,
       source: "merchant",
       userId: userResult.user._id,
+      formStep: 1,
+    });
+
+    const sanitized = MerchantLead.sanitize({
+      ...lead,
+      accountStatus: userResult.user.status ?? "inactive",
     });
 
     return res.status(201).json({
-      message:
-        "Your request has been submitted successfully. You can sign in once an admin activates your account.",
-      lead: MerchantLead.sanitize({
-        ...lead,
-        accountStatus: userResult.user.status ?? "inactive",
-      }),
+      id: sanitized.id,
+      message: "Step 1 saved successfully",
+      lead: sanitized,
     });
   } catch (error) {
     console.error("Merchant form error:", error);
     return res.status(500).json({ message: "Failed to submit merchant form" });
+  }
+}
+
+export async function updateMerchantForm(req, res) {
+  try {
+    const lead = await MerchantLead.findById(req.params.id);
+
+    if (!lead) {
+      return res.status(404).json({ message: "Merchant gateway not found" });
+    }
+
+    const { businessName, email, phone, industry } = req.body;
+    const priority = req.body.priority ?? req.body.business;
+    const updates = {};
+
+    if (businessName !== undefined) {
+      if (!businessName?.trim()) {
+        return res.status(400).json({ message: "Business name is required" });
+      }
+      updates.businessName = businessName.trim();
+    }
+
+    if (email !== undefined) {
+      const emailError = validateEmail(email);
+      if (emailError) {
+        return res.status(400).json({ message: emailError });
+      }
+      updates.email = email.trim().toLowerCase();
+    }
+
+    if (phone !== undefined) {
+      const phoneError = validateMobilePhone(phone);
+      if (phoneError) {
+        return res.status(400).json({ message: phoneError });
+      }
+      updates.phone = getPhoneDigits(phone);
+    }
+
+    if (industry !== undefined) {
+      if (!industry) {
+        return res.status(400).json({ message: "Industry is required" });
+      }
+      if (!MERCHANT_INDUSTRY_VALUES.includes(industry)) {
+        return res.status(400).json({ message: "Invalid industry value" });
+      }
+      updates.industry = industry;
+      updates.formStep = Math.max(lead.formStep ?? 1, 2);
+    }
+
+    if (priority !== undefined) {
+      if (!priority) {
+        return res.status(400).json({ message: "Priority is required" });
+      }
+      if (!MERCHANT_PRIORITY_VALUES.includes(priority)) {
+        return res.status(400).json({ message: "Invalid priority value" });
+      }
+      updates.priority = priority;
+      updates.formStep = 3;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ message: "No valid fields to update" });
+    }
+
+    const result = await MerchantLead.updateById(req.params.id, updates);
+
+    if (result.invalid) {
+      return res.status(400).json({ message: "Invalid merchant gateway id" });
+    }
+
+    if (!result.updated) {
+      return res.status(404).json({ message: "Merchant gateway not found" });
+    }
+
+    const isComplete = Boolean(result.updated.industry && result.updated.priority);
+    const sanitized = MerchantLead.sanitize(result.updated);
+
+    return res.json({
+      id: sanitized.id,
+      message: isComplete
+        ? "Your request has been submitted successfully. You can sign in once an admin activates your account."
+        : "Progress saved successfully",
+      lead: sanitized,
+      completed: isComplete,
+    });
+  } catch (error) {
+    console.error("Update merchant form error:", error);
+    return res.status(500).json({ message: "Failed to update merchant form" });
   }
 }
 

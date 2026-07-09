@@ -79,19 +79,7 @@ export async function deleteReseller(req, res) {
 
 export async function submitResellerForm(req, res) {
   try {
-    const {
-      fullName,
-      businessName,
-      phone,
-      email,
-      website,
-      partnerType,
-      businessTypes,
-      monthlyBusinessCount,
-      paymentFamiliarity,
-      consent,
-      password,
-    } = req.body;
+    const { fullName, businessName, phone, email, website, password } = req.body;
 
     if (!fullName?.trim() || !businessName?.trim() || !phone?.trim() || !email?.trim() || !password) {
       return res.status(400).json({
@@ -107,45 +95,6 @@ export async function submitResellerForm(req, res) {
     const phoneError = validateMobilePhone(phone);
     if (phoneError) {
       return res.status(400).json({ message: phoneError });
-    }
-
-    if (!partnerType) {
-      return res.status(400).json({ message: "Partner type is required" });
-    }
-
-    if (!Array.isArray(businessTypes) || businessTypes.length === 0) {
-      return res.status(400).json({ message: "At least one business type is required" });
-    }
-
-    if (!monthlyBusinessCount) {
-      return res.status(400).json({ message: "Monthly business count is required" });
-    }
-
-    if (!paymentFamiliarity) {
-      return res.status(400).json({ message: "Payment familiarity is required" });
-    }
-
-    if (!consent) {
-      return res.status(400).json({ message: "Consent is required" });
-    }
-
-    if (!RESELLER_PARTNER_TYPE_VALUES.includes(partnerType)) {
-      return res.status(400).json({ message: "Invalid partner type value" });
-    }
-
-    const invalidBusinessType = businessTypes.find(
-      (value) => !RESELLER_BUSINESS_TYPE_VALUES.includes(value),
-    );
-    if (invalidBusinessType) {
-      return res.status(400).json({ message: "Invalid business type value" });
-    }
-
-    if (!RESELLER_MONTHLY_BUSINESS_COUNT_VALUES.includes(monthlyBusinessCount)) {
-      return res.status(400).json({ message: "Invalid monthly business count value" });
-    }
-
-    if (!RESELLER_PAYMENT_FAMILIARITY_VALUES.includes(paymentFamiliarity)) {
-      return res.status(400).json({ message: "Invalid payment familiarity value" });
     }
 
     const userResult = await createUserFromForm({
@@ -165,26 +114,166 @@ export async function submitResellerForm(req, res) {
       email: email.trim().toLowerCase(),
       phone: getPhoneDigits(phone),
       website: website?.trim() || "",
-      partnerType,
-      businessTypes,
-      monthlyBusinessCount,
-      paymentFamiliarity,
-      consent: true,
+      partnerType: null,
+      businessTypes: [],
+      monthlyBusinessCount: null,
+      paymentFamiliarity: null,
+      consent: false,
       source: "reseller",
       userId: userResult.user._id,
+      formStep: 1,
+    });
+
+    const sanitized = ResellerPartner.sanitize({
+      ...partner,
+      accountStatus: userResult.user.status ?? "inactive",
     });
 
     return res.status(201).json({
-      message:
-        "Your partner application has been submitted successfully. You can sign in once an admin activates your account.",
-      partner: ResellerPartner.sanitize({
-        ...partner,
-        accountStatus: userResult.user.status ?? "inactive",
-      }),
+      id: sanitized.id,
+      message: "Step 1 saved successfully",
+      partner: sanitized,
     });
   } catch (error) {
     console.error("Reseller form error:", error);
     return res.status(500).json({ message: "Failed to submit partner application" });
+  }
+}
+
+export async function updateResellerForm(req, res) {
+  try {
+    const partner = await ResellerPartner.findById(req.params.id);
+
+    if (!partner) {
+      return res.status(404).json({ message: "Reseller not found" });
+    }
+
+    const {
+      fullName,
+      businessName,
+      phone,
+      email,
+      website,
+      partnerType,
+      businessTypes,
+      monthlyBusinessCount,
+      paymentFamiliarity,
+      consent,
+      step,
+    } = req.body;
+
+    const updates = {};
+    const formStep = Number(step);
+
+    if (formStep === 1) {
+      if (!fullName?.trim() || !businessName?.trim() || !phone?.trim() || !email?.trim()) {
+        return res.status(400).json({
+          message: "Full name, business name, phone, and email are required",
+        });
+      }
+
+      const emailError = validateEmail(email);
+      if (emailError) {
+        return res.status(400).json({ message: emailError });
+      }
+
+      const phoneError = validateMobilePhone(phone);
+      if (phoneError) {
+        return res.status(400).json({ message: phoneError });
+      }
+
+      updates.fullName = fullName.trim();
+      updates.businessName = businessName.trim();
+      updates.email = email.trim().toLowerCase();
+      updates.phone = getPhoneDigits(phone);
+      updates.website = website?.trim() || "";
+      updates.formStep = Math.max(partner.formStep ?? 1, 1);
+    } else if (formStep === 2) {
+      if (!partnerType) {
+        return res.status(400).json({ message: "Partner type is required" });
+      }
+
+      if (!RESELLER_PARTNER_TYPE_VALUES.includes(partnerType)) {
+        return res.status(400).json({ message: "Invalid partner type value" });
+      }
+
+      if (!Array.isArray(businessTypes) || businessTypes.length === 0) {
+        return res.status(400).json({ message: "At least one business type is required" });
+      }
+
+      const invalidBusinessType = businessTypes.find(
+        (value) => !RESELLER_BUSINESS_TYPE_VALUES.includes(value),
+      );
+      if (invalidBusinessType) {
+        return res.status(400).json({ message: "Invalid business type value" });
+      }
+
+      if (!monthlyBusinessCount) {
+        return res.status(400).json({ message: "Monthly business count is required" });
+      }
+
+      if (!RESELLER_MONTHLY_BUSINESS_COUNT_VALUES.includes(monthlyBusinessCount)) {
+        return res.status(400).json({ message: "Invalid monthly business count value" });
+      }
+
+      updates.partnerType = partnerType;
+      updates.businessTypes = businessTypes;
+      updates.monthlyBusinessCount = monthlyBusinessCount;
+      updates.formStep = Math.max(partner.formStep ?? 1, 2);
+    } else if (formStep === 3) {
+      if (!paymentFamiliarity) {
+        return res.status(400).json({ message: "Payment familiarity is required" });
+      }
+
+      if (!RESELLER_PAYMENT_FAMILIARITY_VALUES.includes(paymentFamiliarity)) {
+        return res.status(400).json({ message: "Invalid payment familiarity value" });
+      }
+
+      if (!consent) {
+        return res.status(400).json({ message: "Consent is required" });
+      }
+
+      updates.paymentFamiliarity = paymentFamiliarity;
+      updates.consent = true;
+      updates.formStep = 3;
+    } else {
+      return res.status(400).json({ message: "A valid form step is required" });
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ message: "No valid fields to update" });
+    }
+
+    const result = await ResellerPartner.updateById(req.params.id, updates);
+
+    if (result.invalid) {
+      return res.status(400).json({ message: "Invalid reseller id" });
+    }
+
+    if (!result.updated) {
+      return res.status(404).json({ message: "Reseller not found" });
+    }
+
+    const isComplete = Boolean(
+      result.updated.partnerType &&
+        result.updated.businessTypes?.length &&
+        result.updated.monthlyBusinessCount &&
+        result.updated.paymentFamiliarity &&
+        result.updated.consent,
+    );
+    const sanitized = ResellerPartner.sanitize(result.updated);
+
+    return res.json({
+      id: sanitized.id,
+      message: isComplete
+        ? "Your partner application has been submitted successfully. You can sign in once an admin activates your account."
+        : "Progress saved successfully",
+      partner: sanitized,
+      completed: isComplete,
+    });
+  } catch (error) {
+    console.error("Update reseller form error:", error);
+    return res.status(500).json({ message: "Failed to update partner application" });
   }
 }
 

@@ -57,14 +57,39 @@ export const MerchantLead = {
     return leads().findOne({ _id: objectId });
   },
 
+  async updateById(id, data) {
+    const objectId = parseObjectId(id);
+    if (!objectId) {
+      return { invalid: true, updated: null };
+    }
+
+    const updates = {
+      ...data,
+      updatedAt: new Date(),
+    };
+
+    const result = await leads().findOneAndUpdate(
+      { _id: objectId },
+      { $set: updates },
+      { returnDocument: "after" },
+    );
+
+    if (!result) {
+      return { invalid: false, updated: null };
+    }
+
+    return { invalid: false, updated: result };
+  },
+
   sanitize(lead) {
     return {
       id: lead._id.toString(),
       businessName: lead.businessName,
       email: lead.email,
       phone: lead.phone,
-      industry: lead.industry,
-      priority: lead.priority,
+      industry: lead.industry ?? null,
+      priority: lead.priority ?? null,
+      formStep: lead.formStep ?? 1,
       source: lead.source ?? null,
       userId: lead.userId?.toString() ?? null,
       accountStatus: lead.accountStatus ?? "inactive",

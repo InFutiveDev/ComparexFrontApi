@@ -57,6 +57,30 @@ export const PaymentProvider = {
     return providers().findOne({ _id: objectId });
   },
 
+  async updateById(id, data) {
+    const objectId = parseObjectId(id);
+    if (!objectId) {
+      return { invalid: true, updated: null };
+    }
+
+    const updates = {
+      ...data,
+      updatedAt: new Date(),
+    };
+
+    const result = await providers().findOneAndUpdate(
+      { _id: objectId },
+      { $set: updates },
+      { returnDocument: "after" },
+    );
+
+    if (!result) {
+      return { invalid: false, updated: null };
+    }
+
+    return { invalid: false, updated: result };
+  },
+
   sanitize(provider) {
     return {
       id: provider._id.toString(),
@@ -66,9 +90,10 @@ export const PaymentProvider = {
       email: provider.email,
       phone: provider.phone,
       website: provider.website || "",
-      paymentCapabilities: provider.paymentCapabilities,
-      partnershipGoals: provider.partnershipGoals,
+      paymentCapabilities: provider.paymentCapabilities ?? [],
+      partnershipGoals: provider.partnershipGoals ?? [],
       consent: provider.consent ?? false,
+      formStep: provider.formStep ?? 1,
       source: provider.source ?? null,
       userId: provider.userId?.toString() ?? null,
       accountStatus: provider.accountStatus ?? "inactive",

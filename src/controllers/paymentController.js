@@ -73,18 +73,7 @@ export async function deletePaymentGateway(req, res) {
 
 export async function submitPaymentForm(req, res) {
   try {
-    const {
-      companyName,
-      contactPerson,
-      designation,
-      email,
-      phone,
-      website,
-      paymentCapabilities,
-      partnershipGoals,
-      consent,
-      password,
-    } = req.body;
+    const { companyName, contactPerson, designation, email, phone, website, password } = req.body;
 
     if (
       !companyName?.trim() ||
@@ -110,32 +99,6 @@ export async function submitPaymentForm(req, res) {
       return res.status(400).json({ message: phoneError });
     }
 
-    if (!Array.isArray(paymentCapabilities) || paymentCapabilities.length === 0) {
-      return res.status(400).json({ message: "At least one payment capability is required" });
-    }
-
-    if (!Array.isArray(partnershipGoals) || partnershipGoals.length === 0) {
-      return res.status(400).json({ message: "At least one partnership goal is required" });
-    }
-
-    if (!consent) {
-      return res.status(400).json({ message: "Consent is required" });
-    }
-
-    const invalidCapability = paymentCapabilities.find(
-      (value) => !PAYMENT_CAPABILITY_VALUES.includes(value),
-    );
-    if (invalidCapability) {
-      return res.status(400).json({ message: "Invalid payment capability value" });
-    }
-
-    const invalidGoal = partnershipGoals.find(
-      (value) => !PAYMENT_PARTNERSHIP_GOAL_VALUES.includes(value),
-    );
-    if (invalidGoal) {
-      return res.status(400).json({ message: "Invalid partnership goal value" });
-    }
-
     const userResult = await createUserFromForm({
       name: contactPerson.trim(),
       email,
@@ -154,24 +117,163 @@ export async function submitPaymentForm(req, res) {
       email: email.trim().toLowerCase(),
       phone: getPhoneDigits(phone),
       website: website?.trim() || "",
-      paymentCapabilities,
-      partnershipGoals,
-      consent: true,
+      paymentCapabilities: [],
+      partnershipGoals: [],
+      consent: false,
       source: "payment",
       userId: userResult.user._id,
+      formStep: 1,
+    });
+
+    const sanitized = PaymentProvider.sanitize({
+      ...provider,
+      accountStatus: userResult.user.status ?? "inactive",
     });
 
     return res.status(201).json({
-      message:
-        "Your partnership inquiry has been submitted successfully. You can sign in once an admin activates your account.",
-      provider: PaymentProvider.sanitize({
-        ...provider,
-        accountStatus: userResult.user.status ?? "inactive",
-      }),
+      id: sanitized.id,
+      message: "Step 1 saved successfully",
+      provider: sanitized,
     });
   } catch (error) {
     console.error("Payment form error:", error);
     return res.status(500).json({ message: "Failed to submit partnership inquiry" });
+  }
+}
+
+export async function updatePaymentForm(req, res) {
+  try {
+    const provider = await PaymentProvider.findById(req.params.id);
+
+    if (!provider) {
+      return res.status(404).json({ message: "Payment gateway not found" });
+    }
+
+    const {
+      companyName,
+      contactPerson,
+      designation,
+      email,
+      phone,
+      website,
+      paymentCapabilities,
+      partnershipGoals,
+      consent,
+    } = req.body;
+
+    const updates = {};
+
+    if (companyName !== undefined) {
+      if (!companyName?.trim()) {
+        return res.status(400).json({ message: "Company name is required" });
+      }
+      updates.companyName = companyName.trim();
+    }
+
+    if (contactPerson !== undefined) {
+      if (!contactPerson?.trim()) {
+        return res.status(400).json({ message: "Contact person is required" });
+      }
+      updates.contactPerson = contactPerson.trim();
+    }
+
+    if (designation !== undefined) {
+      if (!designation?.trim()) {
+        return res.status(400).json({ message: "Designation is required" });
+      }
+      updates.designation = designation.trim();
+    }
+
+    if (email !== undefined) {
+      const emailError = validateEmail(email);
+      if (emailError) {
+        return res.status(400).json({ message: emailError });
+      }
+      updates.email = email.trim().toLowerCase();
+    }
+
+    if (phone !== undefined) {
+      const phoneError = validateMobilePhone(phone);
+      if (phoneError) {
+        return res.status(400).json({ message: phoneError });
+      }
+      updates.phone = getPhoneDigits(phone);
+    }
+
+    if (website !== undefined) {
+      updates.website = website?.trim() || "";
+    }
+
+    if (paymentCapabilities !== undefined) {
+      if (!Array.isArray(paymentCapabilities) || paymentCapabilities.length === 0) {
+        return res.status(400).json({ message: "At least one payment capability is required" });
+      }
+      const invalidCapability = paymentCapabilities.find(
+        (value) => !PAYMENT_CAPABILITY_VALUES.includes(value),
+      );
+      if (invalidCapability) {
+        return res.status(400).json({ message: "Invalid payment capability value" });
+      }
+      updates.paymentCapabilities = paymentCapabilities;
+      updates.formStep = Math.max(provider.formStep ?? 1, 2);
+    }
+
+    if (partnershipGoals !== undefined || consent !== undefined) {
+      if (partnershipGoals !== undefined) {
+        if (!Array.isArray(partnershipGoals) || partnershipGoals.length === 0) {
+          return res.status(400).json({ message: "At least one partnership goal is required" });
+        }
+        const invalidGoal = partnershipGoals.find(
+          (value) => !PAYMENT_PARTNERSHIP_GOAL_VALUES.includes(value),
+        );
+        if (invalidGoal) {
+          return res.status(400).json({ message: "Invalid partnership goal value" });
+        }
+        updates.partnershipGoals = partnershipGoals;
+      }
+
+      if (consent !== undefined) {
+        if (!consent) {
+          return res.status(400).json({ message: "Consent is required" });
+        }
+        updates.consent = true;
+      }
+
+      updates.formStep = 3;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ message: "No valid fields to update" });
+    }
+
+    const result = await PaymentProvider.updateById(req.params.id, updates);
+
+    if (result.invalid) {
+      return res.status(400).json({ message: "Invalid payment gateway id" });
+    }
+
+    if (!result.updated) {
+      return res.status(404).json({ message: "Payment gateway not found" });
+    }
+
+    const isComplete = Boolean(
+      result.updated.paymentCapabilities?.length &&
+        result.updated.partnershipGoals?.length &&
+        result.updated.consent,
+    );
+    const sanitized = PaymentProvider.sanitize(result.updated);
+
+    return res.json({
+      id: sanitized.id,
+      message: isComplete
+        ? "Your partnership inquiry has been submitted successfully. You can sign in once an admin activates your account."
+        : "Progress saved successfully",
+      provider: sanitized,
+      completed: isComplete,
+    });
+  } catch (error) {
+    console.error("Update payment form error:", error);
+    return res.status(500).json({ message: "Failed to update partnership inquiry" });
   }
 }
 

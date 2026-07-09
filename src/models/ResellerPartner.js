@@ -57,6 +57,30 @@ export const ResellerPartner = {
     return partners().findOne({ _id: objectId });
   },
 
+  async updateById(id, data) {
+    const objectId = parseObjectId(id);
+    if (!objectId) {
+      return { invalid: true, updated: null };
+    }
+
+    const updates = {
+      ...data,
+      updatedAt: new Date(),
+    };
+
+    const result = await partners().findOneAndUpdate(
+      { _id: objectId },
+      { $set: updates },
+      { returnDocument: "after" },
+    );
+
+    if (!result) {
+      return { invalid: false, updated: null };
+    }
+
+    return { invalid: false, updated: result };
+  },
+
   sanitize(partner) {
     return {
       id: partner._id.toString(),
@@ -65,11 +89,12 @@ export const ResellerPartner = {
       email: partner.email,
       phone: partner.phone,
       website: partner.website || "",
-      partnerType: partner.partnerType,
-      businessTypes: partner.businessTypes,
-      monthlyBusinessCount: partner.monthlyBusinessCount,
-      paymentFamiliarity: partner.paymentFamiliarity,
+      partnerType: partner.partnerType ?? null,
+      businessTypes: partner.businessTypes ?? [],
+      monthlyBusinessCount: partner.monthlyBusinessCount ?? null,
+      paymentFamiliarity: partner.paymentFamiliarity ?? null,
       consent: partner.consent ?? false,
+      formStep: partner.formStep ?? 1,
       source: partner.source ?? null,
       userId: partner.userId?.toString() ?? null,
       accountStatus: partner.accountStatus ?? "inactive",
