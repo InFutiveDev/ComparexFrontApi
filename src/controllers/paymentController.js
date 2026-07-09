@@ -5,6 +5,8 @@ import {
   PAYMENT_PARTNERSHIP_GOALS,
 } from "../constants/paymentForm.js";
 import { PaymentProvider } from "../models/PaymentProvider.js";
+import { createUserFromForm } from "../services/formUserAccount.js";
+import { enrichItemsWithAccountStatus, setUserAccountStatus } from "../services/accountStatus.js";
 import { getPhoneDigits, validateEmail, validateMobilePhone } from "../utils/validation.js";
 
 export function getFormOptions(_req, res) {
@@ -36,9 +38,10 @@ export async function getAllPaymentGateways(req, res) {
   try {
     const { page, limit } = req.query;
     const result = await PaymentProvider.findAll({ page, limit });
+    const enrichedItems = await enrichItemsWithAccountStatus(result.items);
 
     return res.json({
-      paymentGateways: result.items.map(PaymentProvider.sanitize),
+      paymentGateways: enrichedItems.map(PaymentProvider.sanitize),
       total: result.total,
       page: result.page,
       limit: result.limit,
@@ -80,6 +83,7 @@ export async function submitPaymentForm(req, res) {
       paymentCapabilities,
       partnershipGoals,
       consent,
+      password,
     } = req.body;
 
     if (
@@ -87,10 +91,12 @@ export async function submitPaymentForm(req, res) {
       !contactPerson?.trim() ||
       !designation?.trim() ||
       !email?.trim() ||
-      !phone?.trim()
+      !phone?.trim() ||
+      !password
     ) {
       return res.status(400).json({
-        message: "Company name, contact person, designation, email, and phone are required",
+        message:
+          "Company name, contact person, designation, email, phone, and password are required",
       });
     }
 
@@ -130,6 +136,17 @@ export async function submitPaymentForm(req, res) {
       return res.status(400).json({ message: "Invalid partnership goal value" });
     }
 
+    const userResult = await createUserFromForm({
+      name: contactPerson.trim(),
+      email,
+      password,
+      role: "payment_provider",
+    });
+
+    if (userResult.message) {
+      return res.status(userResult.status).json({ message: userResult.message });
+    }
+
     const provider = await PaymentProvider.create({
       companyName: companyName.trim(),
       contactPerson: contactPerson.trim(),
@@ -141,14 +158,43 @@ export async function submitPaymentForm(req, res) {
       partnershipGoals,
       consent: true,
       source: "payment",
+      userId: userResult.user._id,
     });
 
     return res.status(201).json({
-      message: "Your partnership inquiry has been submitted successfully",
-      provider: PaymentProvider.sanitize(provider),
+      message:
+        "Your partnership inquiry has been submitted successfully. You can sign in once an admin activates your account.",
+      provider: PaymentProvider.sanitize({
+        ...provider,
+        accountStatus: userResult.user.status ?? "inactive",
+      }),
     });
   } catch (error) {
     console.error("Payment form error:", error);
     return res.status(500).json({ message: "Failed to submit partnership inquiry" });
+  }
+}
+
+export async function updatePaymentAccountStatus(req, res) {
+  try {
+    const provider = await PaymentProvider.findById(req.params.id);
+
+    if (!provider) {
+      return res.status(404).json({ message: "Payment gateway not found" });
+    }
+
+    const result = await setUserAccountStatus(provider.userId, req.body.status);
+
+    if (!result.ok) {
+      return res.status(result.status).json({ message: result.message });
+    }
+
+    return res.json({
+      message: `Account ${result.accountStatus === "active" ? "activated" : "deactivated"} successfully`,
+      accountStatus: result.accountStatus,
+    });
+  } catch (error) {
+    console.error("Update payment account status error:", error);
+    return res.status(500).json({ message: "Failed to update account status" });
   }
 }

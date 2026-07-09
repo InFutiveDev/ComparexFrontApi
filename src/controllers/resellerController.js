@@ -9,6 +9,8 @@ import {
   RESELLER_PAYMENT_FAMILIARITY_VALUES,
 } from "../constants/resellerForm.js";
 import { ResellerPartner } from "../models/ResellerPartner.js";
+import { createUserFromForm } from "../services/formUserAccount.js";
+import { enrichItemsWithAccountStatus, setUserAccountStatus } from "../services/accountStatus.js";
 import { getPhoneDigits, validateEmail, validateMobilePhone } from "../utils/validation.js";
 
 export function getFormOptions(_req, res) {
@@ -42,9 +44,10 @@ export async function getAllResellers(req, res) {
   try {
     const { page, limit } = req.query;
     const result = await ResellerPartner.findAll({ page, limit });
+    const enrichedItems = await enrichItemsWithAccountStatus(result.items);
 
     return res.json({
-      resellers: result.items.map(ResellerPartner.sanitize),
+      resellers: enrichedItems.map(ResellerPartner.sanitize),
       total: result.total,
       page: result.page,
       limit: result.limit,
@@ -87,11 +90,12 @@ export async function submitResellerForm(req, res) {
       monthlyBusinessCount,
       paymentFamiliarity,
       consent,
+      password,
     } = req.body;
 
-    if (!fullName?.trim() || !businessName?.trim() || !phone?.trim() || !email?.trim()) {
+    if (!fullName?.trim() || !businessName?.trim() || !phone?.trim() || !email?.trim() || !password) {
       return res.status(400).json({
-        message: "Full name, business name, phone, and email are required",
+        message: "Full name, business name, phone, email, and password are required",
       });
     }
 
@@ -144,6 +148,17 @@ export async function submitResellerForm(req, res) {
       return res.status(400).json({ message: "Invalid payment familiarity value" });
     }
 
+    const userResult = await createUserFromForm({
+      name: fullName.trim(),
+      email,
+      password,
+      role: "reseller",
+    });
+
+    if (userResult.message) {
+      return res.status(userResult.status).json({ message: userResult.message });
+    }
+
     const partner = await ResellerPartner.create({
       fullName: fullName.trim(),
       businessName: businessName.trim(),
@@ -156,14 +171,43 @@ export async function submitResellerForm(req, res) {
       paymentFamiliarity,
       consent: true,
       source: "reseller",
+      userId: userResult.user._id,
     });
 
     return res.status(201).json({
-      message: "Your partner application has been submitted successfully",
-      partner: ResellerPartner.sanitize(partner),
+      message:
+        "Your partner application has been submitted successfully. You can sign in once an admin activates your account.",
+      partner: ResellerPartner.sanitize({
+        ...partner,
+        accountStatus: userResult.user.status ?? "inactive",
+      }),
     });
   } catch (error) {
     console.error("Reseller form error:", error);
     return res.status(500).json({ message: "Failed to submit partner application" });
+  }
+}
+
+export async function updateResellerAccountStatus(req, res) {
+  try {
+    const partner = await ResellerPartner.findById(req.params.id);
+
+    if (!partner) {
+      return res.status(404).json({ message: "Reseller not found" });
+    }
+
+    const result = await setUserAccountStatus(partner.userId, req.body.status);
+
+    if (!result.ok) {
+      return res.status(result.status).json({ message: result.message });
+    }
+
+    return res.json({
+      message: `Account ${result.accountStatus === "active" ? "activated" : "deactivated"} successfully`,
+      accountStatus: result.accountStatus,
+    });
+  } catch (error) {
+    console.error("Update reseller account status error:", error);
+    return res.status(500).json({ message: "Failed to update account status" });
   }
 }

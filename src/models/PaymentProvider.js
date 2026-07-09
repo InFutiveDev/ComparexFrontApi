@@ -48,6 +48,15 @@ export const PaymentProvider = {
     return { invalid: false, deleted: result.deletedCount > 0 };
   },
 
+  findById(id) {
+    const objectId = parseObjectId(id);
+    if (!objectId) {
+      return null;
+    }
+
+    return providers().findOne({ _id: objectId });
+  },
+
   sanitize(provider) {
     return {
       id: provider._id.toString(),
@@ -61,6 +70,8 @@ export const PaymentProvider = {
       partnershipGoals: provider.partnershipGoals,
       consent: provider.consent ?? false,
       source: provider.source ?? null,
+      userId: provider.userId?.toString() ?? null,
+      accountStatus: provider.accountStatus ?? "inactive",
       createdAt: provider.createdAt,
     };
   },

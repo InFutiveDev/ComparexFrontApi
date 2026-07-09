@@ -48,6 +48,15 @@ export const ResellerPartner = {
     return { invalid: false, deleted: result.deletedCount > 0 };
   },
 
+  findById(id) {
+    const objectId = parseObjectId(id);
+    if (!objectId) {
+      return null;
+    }
+
+    return partners().findOne({ _id: objectId });
+  },
+
   sanitize(partner) {
     return {
       id: partner._id.toString(),
@@ -62,6 +71,8 @@ export const ResellerPartner = {
       paymentFamiliarity: partner.paymentFamiliarity,
       consent: partner.consent ?? false,
       source: partner.source ?? null,
+      userId: partner.userId?.toString() ?? null,
+      accountStatus: partner.accountStatus ?? "inactive",
       createdAt: partner.createdAt,
     };
   },

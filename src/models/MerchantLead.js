@@ -48,6 +48,15 @@ export const MerchantLead = {
     return { invalid: false, deleted: result.deletedCount > 0 };
   },
 
+  findById(id) {
+    const objectId = parseObjectId(id);
+    if (!objectId) {
+      return null;
+    }
+
+    return leads().findOne({ _id: objectId });
+  },
+
   sanitize(lead) {
     return {
       id: lead._id.toString(),
@@ -57,6 +66,8 @@ export const MerchantLead = {
       industry: lead.industry,
       priority: lead.priority,
       source: lead.source ?? null,
+      userId: lead.userId?.toString() ?? null,
+      accountStatus: lead.accountStatus ?? "inactive",
       createdAt: lead.createdAt,
     };
   },

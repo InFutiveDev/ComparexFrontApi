@@ -2,15 +2,8 @@ import bcrypt from "bcryptjs";
 import { User } from "../models/User.js";
 import { RefreshToken } from "../models/RefreshToken.js";
 import { issueAuthTokens } from "../utils/authTokens.js";
-
-function authPayload(user, tokens) {
-  return {
-    token: tokens.accessToken,
-    accessToken: tokens.accessToken,
-    refreshToken: tokens.refreshToken,
-    user: User.sanitize(user),
-  };
-}
+import { buildAuthResponse } from "../utils/authResponse.js";
+import { validatePassword } from "../utils/validation.js";
 
 export async function register(req, res) {
   try {
@@ -36,11 +29,13 @@ export async function register(req, res) {
       name: name.trim(),
       email: normalizedEmail,
       passwordHash,
+      role: "admin",
+      status: "active",
     });
 
     const tokens = await issueAuthTokens(user);
 
-    return res.status(201).json(authPayload(user, tokens));
+    return res.status(201).json(buildAuthResponse(user, tokens));
   } catch (error) {
     console.error("Register error:", error);
     return res.status(500).json({ message: "Failed to create account" });
@@ -67,9 +62,15 @@ export async function login(req, res) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
+    if ((user.status ?? "inactive") !== "active" && (user.role ?? "user") !== "admin") {
+      return res.status(403).json({
+        message: "Your account is inactive. Please contact admin to activate your account.",
+      });
+    }
+
     const tokens = await issueAuthTokens(user);
 
-    return res.json(authPayload(user, tokens));
+    return res.json(buildAuthResponse(user, tokens));
   } catch (error) {
     console.error("Login error:", error);
     return res.status(500).json({ message: "Failed to sign in" });
@@ -95,6 +96,11 @@ export async function refresh(req, res) {
       return res.status(401).json({ message: "Invalid or expired refresh token" });
     }
 
+    if ((user.status ?? "inactive") !== "active" && (user.role ?? "user") !== "admin") {
+      await RefreshToken.revoke(refreshToken);
+      return res.status(403).json({ message: "Your account is inactive" });
+    }
+
     await RefreshToken.revoke(refreshToken);
     const tokens = await issueAuthTokens(user);
 
@@ -115,6 +121,10 @@ export async function me(req, res) {
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
+    }
+
+    if ((user.status ?? "inactive") !== "active" && (user.role ?? "user") !== "admin") {
+      return res.status(403).json({ message: "Your account is inactive" });
     }
 
     return res.json({ user: User.sanitize(user) });
