@@ -137,34 +137,33 @@ export async function updateMerchantForm(req, res) {
       return res.status(404).json({ message: "Merchant gateway not found" });
     }
 
-    const { businessName, email, phone, industry } = req.body;
+    const { businessName, email, phone, industry, step } = req.body;
     const priority = req.body.priority ?? req.body.business;
     const updates = {};
+    const formStep = Number(step);
 
-    if (businessName !== undefined) {
-      if (!businessName?.trim()) {
-        return res.status(400).json({ message: "Business name is required" });
+    if (formStep === 1) {
+      if (!businessName?.trim() || !email?.trim() || !phone?.trim()) {
+        return res.status(400).json({
+          message: "Business name, email, and phone are required",
+        });
       }
-      updates.businessName = businessName.trim();
-    }
 
-    if (email !== undefined) {
       const emailError = validateEmail(email);
       if (emailError) {
         return res.status(400).json({ message: emailError });
       }
-      updates.email = email.trim().toLowerCase();
-    }
 
-    if (phone !== undefined) {
       const phoneError = validateMobilePhone(phone);
       if (phoneError) {
         return res.status(400).json({ message: phoneError });
       }
-      updates.phone = getPhoneDigits(phone);
-    }
 
-    if (industry !== undefined) {
+      updates.businessName = businessName.trim();
+      updates.email = email.trim().toLowerCase();
+      updates.phone = getPhoneDigits(phone);
+      updates.formStep = Math.max(lead.formStep ?? 1, 1);
+    } else if (formStep === 2) {
       if (!industry) {
         return res.status(400).json({ message: "Industry is required" });
       }
@@ -173,9 +172,7 @@ export async function updateMerchantForm(req, res) {
       }
       updates.industry = industry;
       updates.formStep = Math.max(lead.formStep ?? 1, 2);
-    }
-
-    if (priority !== undefined) {
+    } else if (formStep === 3) {
       if (!priority) {
         return res.status(400).json({ message: "Priority is required" });
       }
@@ -184,6 +181,8 @@ export async function updateMerchantForm(req, res) {
       }
       updates.priority = priority;
       updates.formStep = 3;
+    } else {
+      return res.status(400).json({ message: "A valid form step is required" });
     }
 
     if (Object.keys(updates).length === 0) {

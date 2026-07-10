@@ -78,14 +78,12 @@ export async function submitPaymentForm(req, res) {
     if (
       !companyName?.trim() ||
       !contactPerson?.trim() ||
-      !designation?.trim() ||
       !email?.trim() ||
       !phone?.trim() ||
       !password
     ) {
       return res.status(400).json({
-        message:
-          "Company name, contact person, designation, email, phone, and password are required",
+        message: "Company name, contact person, email, phone, and password are required",
       });
     }
 
@@ -113,7 +111,7 @@ export async function submitPaymentForm(req, res) {
     const provider = await PaymentProvider.create({
       companyName: companyName.trim(),
       contactPerson: contactPerson.trim(),
-      designation: designation.trim(),
+      designation: designation?.trim() || "Not specified",
       email: email.trim().toLowerCase(),
       phone: getPhoneDigits(phone),
       website: website?.trim() || "",
@@ -159,87 +157,76 @@ export async function updatePaymentForm(req, res) {
       paymentCapabilities,
       partnershipGoals,
       consent,
+      step,
     } = req.body;
 
     const updates = {};
+    const formStep = Number(step);
 
-    if (companyName !== undefined) {
-      if (!companyName?.trim()) {
-        return res.status(400).json({ message: "Company name is required" });
+    if (formStep === 1) {
+      if (
+        !companyName?.trim() ||
+        !contactPerson?.trim() ||
+        !email?.trim() ||
+        !phone?.trim()
+      ) {
+        return res.status(400).json({
+          message: "Company name, contact person, email, and phone are required",
+        });
       }
-      updates.companyName = companyName.trim();
-    }
 
-    if (contactPerson !== undefined) {
-      if (!contactPerson?.trim()) {
-        return res.status(400).json({ message: "Contact person is required" });
-      }
-      updates.contactPerson = contactPerson.trim();
-    }
-
-    if (designation !== undefined) {
-      if (!designation?.trim()) {
-        return res.status(400).json({ message: "Designation is required" });
-      }
-      updates.designation = designation.trim();
-    }
-
-    if (email !== undefined) {
       const emailError = validateEmail(email);
       if (emailError) {
         return res.status(400).json({ message: emailError });
       }
-      updates.email = email.trim().toLowerCase();
-    }
 
-    if (phone !== undefined) {
       const phoneError = validateMobilePhone(phone);
       if (phoneError) {
         return res.status(400).json({ message: phoneError });
       }
+
+      updates.companyName = companyName.trim();
+      updates.contactPerson = contactPerson.trim();
+      updates.designation = designation?.trim() || provider.designation || "Not specified";
+      updates.email = email.trim().toLowerCase();
       updates.phone = getPhoneDigits(phone);
-    }
-
-    if (website !== undefined) {
       updates.website = website?.trim() || "";
-    }
-
-    if (paymentCapabilities !== undefined) {
+      updates.formStep = Math.max(provider.formStep ?? 1, 1);
+    } else if (formStep === 2) {
       if (!Array.isArray(paymentCapabilities) || paymentCapabilities.length === 0) {
         return res.status(400).json({ message: "At least one payment capability is required" });
       }
+
       const invalidCapability = paymentCapabilities.find(
         (value) => !PAYMENT_CAPABILITY_VALUES.includes(value),
       );
       if (invalidCapability) {
         return res.status(400).json({ message: "Invalid payment capability value" });
       }
+
       updates.paymentCapabilities = paymentCapabilities;
       updates.formStep = Math.max(provider.formStep ?? 1, 2);
-    }
-
-    if (partnershipGoals !== undefined || consent !== undefined) {
-      if (partnershipGoals !== undefined) {
-        if (!Array.isArray(partnershipGoals) || partnershipGoals.length === 0) {
-          return res.status(400).json({ message: "At least one partnership goal is required" });
-        }
-        const invalidGoal = partnershipGoals.find(
-          (value) => !PAYMENT_PARTNERSHIP_GOAL_VALUES.includes(value),
-        );
-        if (invalidGoal) {
-          return res.status(400).json({ message: "Invalid partnership goal value" });
-        }
-        updates.partnershipGoals = partnershipGoals;
+    } else if (formStep === 3) {
+      if (!Array.isArray(partnershipGoals) || partnershipGoals.length === 0) {
+        return res.status(400).json({ message: "At least one partnership goal is required" });
       }
 
-      if (consent !== undefined) {
-        if (!consent) {
-          return res.status(400).json({ message: "Consent is required" });
-        }
-        updates.consent = true;
+      const invalidGoal = partnershipGoals.find(
+        (value) => !PAYMENT_PARTNERSHIP_GOAL_VALUES.includes(value),
+      );
+      if (invalidGoal) {
+        return res.status(400).json({ message: "Invalid partnership goal value" });
       }
 
+      if (!consent) {
+        return res.status(400).json({ message: "Consent is required" });
+      }
+
+      updates.partnershipGoals = partnershipGoals;
+      updates.consent = true;
       updates.formStep = 3;
+    } else {
+      return res.status(400).json({ message: "A valid form step is required" });
     }
 
     if (Object.keys(updates).length === 0) {

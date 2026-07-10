@@ -3,7 +3,12 @@ import { User } from "../models/User.js";
 import { RefreshToken } from "../models/RefreshToken.js";
 import { issueAuthTokens } from "../utils/authTokens.js";
 import { buildAuthResponse } from "../utils/authResponse.js";
-import { validatePassword } from "../utils/validation.js";
+import {
+  canLoginWithRole,
+  formatRoleLabel,
+  resolveLoginRole,
+  USER_ROLES,
+} from "../constants/userRoles.js";
 
 export async function register(req, res) {
   try {
@@ -44,10 +49,16 @@ export async function register(req, res) {
 
 export async function login(req, res) {
   try {
-    const { email, password } = req.body;
+    const { email, password, role, accountType } = req.body;
 
     if (!email?.trim() || !password) {
       return res.status(400).json({ message: "Email and password are required" });
+    }
+
+    const expectedRole = resolveLoginRole({ role, accountType });
+
+    if (accountType && !expectedRole) {
+      return res.status(400).json({ message: "Invalid account type selected" });
     }
 
     const normalizedEmail = email.trim().toLowerCase();
@@ -62,7 +73,13 @@ export async function login(req, res) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    if ((user.status ?? "inactive") !== "active" && (user.role ?? "user") !== "admin") {
+    if (!canLoginWithRole(user.role, expectedRole)) {
+      return res.status(403).json({
+        message: `This account is registered as ${formatRoleLabel(user.role)}. Please sign in using the ${formatRoleLabel(user.role)} tab.`,
+      });
+    }
+
+    if ((user.status ?? "inactive") !== "active" && (user.role ?? "user") !== USER_ROLES.ADMIN) {
       return res.status(403).json({
         message: "Your account is inactive. Please contact admin to activate your account.",
       });
@@ -96,7 +113,7 @@ export async function refresh(req, res) {
       return res.status(401).json({ message: "Invalid or expired refresh token" });
     }
 
-    if ((user.status ?? "inactive") !== "active" && (user.role ?? "user") !== "admin") {
+    if ((user.status ?? "inactive") !== "active" && (user.role ?? "user") !== USER_ROLES.ADMIN) {
       await RefreshToken.revoke(refreshToken);
       return res.status(403).json({ message: "Your account is inactive" });
     }
@@ -123,7 +140,7 @@ export async function me(req, res) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    if ((user.status ?? "inactive") !== "active" && (user.role ?? "user") !== "admin") {
+    if ((user.status ?? "inactive") !== "active" && (user.role ?? "user") !== USER_ROLES.ADMIN) {
       return res.status(403).json({ message: "Your account is inactive" });
     }
 
