@@ -3,6 +3,7 @@ import {
   deletePaymentGateway,
   getAllPaymentGateways,
   getFormOptions,
+  getPaymentGatewayById,
   submitPaymentForm,
   updatePaymentAccountStatus,
   updatePaymentForm,
@@ -13,6 +14,7 @@ const router = Router();
 
 router.get("/form-options", getFormOptions);
 router.get("/", authMiddleware, getAllPaymentGateways);
+router.get("/:id", authMiddleware, getPaymentGatewayById);
 router.post("/", submitPaymentForm);
 router.patch("/:id/account-status", authMiddleware, updatePaymentAccountStatus);
 router.patch("/:id", updatePaymentForm);

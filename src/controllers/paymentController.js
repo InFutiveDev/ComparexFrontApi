@@ -52,6 +52,25 @@ export async function getAllPaymentGateways(req, res) {
   }
 }
 
+export async function getPaymentGatewayById(req, res) {
+  try {
+    const provider = await PaymentProvider.findById(req.params.id);
+
+    if (!provider) {
+      return res.status(404).json({ message: "Payment gateway not found" });
+    }
+
+    const [enriched] = await enrichItemsWithAccountStatus([provider]);
+
+    return res.json({
+      paymentGateway: PaymentProvider.sanitize(enriched),
+    });
+  } catch (error) {
+    console.error("Get payment gateway error:", error);
+    return res.status(500).json({ message: "Failed to fetch payment gateway" });
+  }
+}
+
 export async function deletePaymentGateway(req, res) {
   try {
     const result = await PaymentProvider.deleteById(req.params.id);

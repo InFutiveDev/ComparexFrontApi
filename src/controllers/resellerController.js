@@ -58,6 +58,25 @@ export async function getAllResellers(req, res) {
   }
 }
 
+export async function getResellerById(req, res) {
+  try {
+    const partner = await ResellerPartner.findById(req.params.id);
+
+    if (!partner) {
+      return res.status(404).json({ message: "Reseller not found" });
+    }
+
+    const [enriched] = await enrichItemsWithAccountStatus([partner]);
+
+    return res.json({
+      reseller: ResellerPartner.sanitize(enriched),
+    });
+  } catch (error) {
+    console.error("Get reseller error:", error);
+    return res.status(500).json({ message: "Failed to fetch reseller" });
+  }
+}
+
 export async function deleteReseller(req, res) {
   try {
     const result = await ResellerPartner.deleteById(req.params.id);

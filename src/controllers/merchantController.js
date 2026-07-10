@@ -52,6 +52,25 @@ export async function getAllMerchantGateways(req, res) {
   }
 }
 
+export async function getMerchantGatewayById(req, res) {
+  try {
+    const lead = await MerchantLead.findById(req.params.id);
+
+    if (!lead) {
+      return res.status(404).json({ message: "Merchant gateway not found" });
+    }
+
+    const [enriched] = await enrichItemsWithAccountStatus([lead]);
+
+    return res.json({
+      merchantGateway: MerchantLead.sanitize(enriched),
+    });
+  } catch (error) {
+    console.error("Get merchant gateway error:", error);
+    return res.status(500).json({ message: "Failed to fetch merchant gateway" });
+  }
+}
+
 export async function deleteMerchantGateway(req, res) {
   try {
     const result = await MerchantLead.deleteById(req.params.id);

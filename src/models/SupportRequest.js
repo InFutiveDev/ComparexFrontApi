@@ -48,6 +48,15 @@ export const SupportRequest = {
     return { invalid: false, deleted: result.deletedCount > 0 };
   },
 
+  findById(id) {
+    const objectId = parseObjectId(id);
+    if (!objectId) {
+      return null;
+    }
+
+    return requests().findOne({ _id: objectId });
+  },
+
   sanitize(request) {
     return {
       id: request._id.toString(),

@@ -4,7 +4,7 @@ import {
   SUPPORT_DISCLOSURE,
 } from "../constants/supportForm.js";
 import { SupportRequest } from "../models/SupportRequest.js";
-import { uploadFileToS3 } from "../services/s3Service.js";
+import { uploadFileToS3, withSignedAttachmentUrls } from "../services/s3Service.js";
 import { handleUploadError } from "./uploadController.js";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -25,6 +25,14 @@ function getField(body, ...keys) {
   }
 
   return "";
+}
+
+async function sanitizeSupportRequest(request) {
+  const sanitized = SupportRequest.sanitize(request);
+  return {
+    ...sanitized,
+    attachments: await withSignedAttachmentUrls(sanitized.attachments),
+  };
 }
 
 export function getSupportFormOptions(_req, res) {
@@ -52,9 +60,10 @@ export async function getAllMerchantSupport(req, res) {
   try {
     const { page, limit } = req.query;
     const result = await SupportRequest.findAll({ page, limit });
+    const merchantSupport = await Promise.all(result.items.map(sanitizeSupportRequest));
 
     return res.json({
-      merchantSupport: result.items.map(SupportRequest.sanitize),
+      merchantSupport,
       total: result.total,
       page: result.page,
       limit: result.limit,
@@ -62,6 +71,23 @@ export async function getAllMerchantSupport(req, res) {
   } catch (error) {
     console.error("Get merchant support error:", error);
     return res.status(500).json({ message: "Failed to fetch merchant support requests" });
+  }
+}
+
+export async function getMerchantSupportById(req, res) {
+  try {
+    const request = await SupportRequest.findById(req.params.id);
+
+    if (!request) {
+      return res.status(404).json({ message: "Merchant support request not found" });
+    }
+
+    return res.json({
+      merchantSupport: await sanitizeSupportRequest(request),
+    });
+  } catch (error) {
+    console.error("Get merchant support error:", error);
+    return res.status(500).json({ message: "Failed to fetch merchant support request" });
   }
 }
 
@@ -142,7 +168,7 @@ export async function submitSupportRequest(req, res) {
 
     return res.status(201).json({
       message: "Your request has been submitted successfully",
-      request: SupportRequest.sanitize(request),
+      request: await sanitizeSupportRequest(request),
     });
   } catch (error) {
     return handleUploadError(error, res);

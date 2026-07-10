@@ -3,6 +3,7 @@ import {
   deleteReseller,
   getAllResellers,
   getFormOptions,
+  getResellerById,
   submitResellerForm,
   updateResellerAccountStatus,
   updateResellerForm,
@@ -13,6 +14,7 @@ const router = Router();
 
 router.get("/form-options", getFormOptions);
 router.get("/", authMiddleware, getAllResellers);
+router.get("/:id", authMiddleware, getResellerById);
 router.post("/", submitResellerForm);
 router.patch("/:id/account-status", authMiddleware, updateResellerAccountStatus);
 router.patch("/:id", updateResellerForm);
