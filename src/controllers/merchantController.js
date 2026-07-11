@@ -5,7 +5,6 @@ import {
   MERCHANT_PRIORITY_VALUES,
 } from "../constants/merchantForm.js";
 import { MerchantLead } from "../models/MerchantLead.js";
-import { createUserFromForm } from "../services/formUserAccount.js";
 import { enrichItemsWithAccountStatus, setUserAccountStatus } from "../services/accountStatus.js";
 import { getPhoneDigits, validateEmail, validateMobilePhone } from "../utils/validation.js";
 
@@ -92,11 +91,11 @@ export async function deleteMerchantGateway(req, res) {
 
 export async function submitMerchantForm(req, res) {
   try {
-    const { businessName, email, phone, password } = req.body;
+    const { businessName, email, phone } = req.body;
 
-    if (!businessName?.trim() || !email?.trim() || !phone?.trim() || !password) {
+    if (!businessName?.trim() || !email?.trim() || !phone?.trim()) {
       return res.status(400).json({
-        message: "Business name, email, phone, and password are required",
+        message: "Business name, email, and phone are required",
       });
     }
 
@@ -110,17 +109,6 @@ export async function submitMerchantForm(req, res) {
       return res.status(400).json({ message: phoneError });
     }
 
-    const userResult = await createUserFromForm({
-      name: businessName.trim(),
-      email,
-      password,
-      role: "merchant",
-    });
-
-    if (userResult.message) {
-      return res.status(userResult.status).json({ message: userResult.message });
-    }
-
     const lead = await MerchantLead.create({
       businessName: businessName.trim(),
       email: email.trim().toLowerCase(),
@@ -128,13 +116,13 @@ export async function submitMerchantForm(req, res) {
       industry: null,
       priority: null,
       source: "merchant",
-      userId: userResult.user._id,
+      userId: null,
       formStep: 1,
     });
 
     const sanitized = MerchantLead.sanitize({
       ...lead,
-      accountStatus: userResult.user.status ?? "inactive",
+      accountStatus: "inactive",
     });
 
     return res.status(201).json({
@@ -224,7 +212,7 @@ export async function updateMerchantForm(req, res) {
     return res.json({
       id: sanitized.id,
       message: isComplete
-        ? "Your request has been submitted successfully. You can sign in once an admin activates your account."
+        ? "Your request has been submitted successfully"
         : "Progress saved successfully",
       lead: sanitized,
       completed: isComplete,

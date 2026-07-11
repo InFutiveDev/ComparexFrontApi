@@ -10,9 +10,21 @@ import {
   USER_ROLES,
 } from "../constants/userRoles.js";
 
+const REGISTER_ACCOUNT_TYPE_TO_ROLE = {
+  merchant: USER_ROLES.MERCHANT,
+  reseller: USER_ROLES.RESELLER,
+  "payment-gateway": USER_ROLES.PAYMENT_PROVIDER,
+  "payment_provider": USER_ROLES.PAYMENT_PROVIDER,
+  admin: USER_ROLES.ADMIN,
+  Merchant: USER_ROLES.MERCHANT,
+  Reseller: USER_ROLES.RESELLER,
+  "Payment Gateway": USER_ROLES.PAYMENT_PROVIDER,
+  Admin: USER_ROLES.ADMIN,
+};
+
 export async function register(req, res) {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, accountType, role } = req.body;
 
     if (!name?.trim() || !email?.trim() || !password) {
       return res.status(400).json({ message: "Name, email, and password are required" });
@@ -20,6 +32,17 @@ export async function register(req, res) {
 
     if (password.length < 6) {
       return res.status(400).json({ message: "Password must be at least 6 characters" });
+    }
+
+    const resolvedRole =
+      REGISTER_ACCOUNT_TYPE_TO_ROLE[accountType] ||
+      REGISTER_ACCOUNT_TYPE_TO_ROLE[role] ||
+      null;
+
+    if (!resolvedRole) {
+      return res.status(400).json({
+        message: "Please select a valid account type (Merchant, Reseller, Payment Gateway, or Admin)",
+      });
     }
 
     const normalizedEmail = email.trim().toLowerCase();
@@ -34,7 +57,7 @@ export async function register(req, res) {
       name: name.trim(),
       email: normalizedEmail,
       passwordHash,
-      role: "admin",
+      role: resolvedRole,
       status: "active",
     });
 
@@ -79,12 +102,6 @@ export async function login(req, res) {
       });
     }
 
-    if ((user.status ?? "inactive") !== "active" && (user.role ?? "user") !== USER_ROLES.ADMIN) {
-      return res.status(403).json({
-        message: "Your account is inactive. Please contact admin to activate your account.",
-      });
-    }
-
     const tokens = await issueAuthTokens(user);
 
     return res.json(buildAuthResponse(user, tokens));
@@ -113,11 +130,6 @@ export async function refresh(req, res) {
       return res.status(401).json({ message: "Invalid or expired refresh token" });
     }
 
-    if ((user.status ?? "inactive") !== "active" && (user.role ?? "user") !== USER_ROLES.ADMIN) {
-      await RefreshToken.revoke(refreshToken);
-      return res.status(403).json({ message: "Your account is inactive" });
-    }
-
     await RefreshToken.revoke(refreshToken);
     const tokens = await issueAuthTokens(user);
 
@@ -138,10 +150,6 @@ export async function me(req, res) {
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
-    }
-
-    if ((user.status ?? "inactive") !== "active" && (user.role ?? "user") !== USER_ROLES.ADMIN) {
-      return res.status(403).json({ message: "Your account is inactive" });
     }
 
     return res.json({ user: User.sanitize(user) });

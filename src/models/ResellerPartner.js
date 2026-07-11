@@ -1,10 +1,26 @@
 import { getDb } from "../mongo.js";
 import { parseObjectId } from "../utils/objectId.js";
+import {
+  computeResellerProfileCompletion,
+  resolveVerificationStatus,
+} from "../utils/resellerProfile.js";
+import { RESELLER_VERIFICATION_STATUSES } from "../constants/resellerForm.js";
 
 const COLLECTION = "reseller_partners";
 
 function partners() {
   return getDb().collection(COLLECTION);
+}
+
+function sanitizeFile(file) {
+  if (!file || typeof file !== "object") return null;
+  return {
+    key: file.key || null,
+    url: file.url || null,
+    fileName: file.fileName || null,
+    mimeType: file.mimeType || null,
+    size: file.size || null,
+  };
 }
 
 export const ResellerPartner = {
@@ -57,6 +73,15 @@ export const ResellerPartner = {
     return partners().findOne({ _id: objectId });
   },
 
+  findByUserId(userId) {
+    const objectId = parseObjectId(userId);
+    if (!objectId) {
+      return null;
+    }
+
+    return partners().findOne({ userId: objectId });
+  },
+
   async updateById(id, data) {
     const objectId = parseObjectId(id);
     if (!objectId) {
@@ -82,6 +107,11 @@ export const ResellerPartner = {
   },
 
   sanitize(partner) {
+    const profileCompletion = computeResellerProfileCompletion(partner);
+    const verificationStatus =
+      partner.verificationStatus ||
+      resolveVerificationStatus(partner, profileCompletion);
+
     return {
       id: partner._id.toString(),
       fullName: partner.fullName,
@@ -94,11 +124,34 @@ export const ResellerPartner = {
       monthlyBusinessCount: partner.monthlyBusinessCount ?? null,
       paymentFamiliarity: partner.paymentFamiliarity ?? null,
       consent: partner.consent ?? false,
+      partnershipModel: partner.partnershipModel ?? null,
+      cityState: partner.cityState ?? "",
+      yearsExperience: partner.yearsExperience ?? null,
+      merchantNetworkSize: partner.merchantNetworkSize ?? null,
+      monthlyReferrals: partner.monthlyReferrals ?? null,
+      panCard: partner.panCard ?? "",
+      aadhaarId: partner.aadhaarId ?? "",
+      gstCertificate: sanitizeFile(partner.gstCertificate),
+      bankAccountHolderName: partner.bankAccountHolderName ?? "",
+      bankName: partner.bankName ?? "",
+      bankAccountNumber: partner.bankAccountNumber ?? "",
+      bankIfsc: partner.bankIfsc ?? "",
+      bankBranch: partner.bankBranch ?? "",
+      bankAccountType: partner.bankAccountType ?? null,
+      bankProof: sanitizeFile(partner.bankProof),
+      resellerAgreement: Boolean(partner.resellerAgreement),
+      commissionPolicy: Boolean(partner.commissionPolicy),
+      verificationStatus,
+      profileCompletionPercent: profileCompletion.percent,
+      profileCompletion,
       formStep: partner.formStep ?? 1,
       source: partner.source ?? null,
       userId: partner.userId?.toString() ?? null,
       accountStatus: partner.accountStatus ?? "inactive",
       createdAt: partner.createdAt,
+      updatedAt: partner.updatedAt ?? null,
     };
   },
 };
+
+export { RESELLER_VERIFICATION_STATUSES };

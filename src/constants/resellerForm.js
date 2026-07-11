@@ -30,11 +30,62 @@ export const RESELLER_PAYMENT_FAMILIARITY = [
   { value: "regular-advisor", label: "Regularly Advise Businesses on Payment Solutions" },
 ];
 
+export const RESELLER_PARTNERSHIP_MODELS = [
+  { value: "qualified-opportunity-fee", label: "Qualified Opportunity Fee" },
+  { value: "revenue-sharing", label: "Revenue Sharing" },
+];
+
+export const RESELLER_YEARS_EXPERIENCE = [
+  { value: "0-1", label: "0–1 years" },
+  { value: "1-3", label: "1–3 years" },
+  { value: "3-5", label: "3–5 years" },
+  { value: "5-10", label: "5–10 years" },
+  { value: "10-plus", label: "10+ years" },
+];
+
+export const RESELLER_MERCHANT_NETWORK_SIZES = [
+  { value: "none", label: "No existing network" },
+  { value: "1-10", label: "1–10 merchants" },
+  { value: "11-50", label: "11–50 merchants" },
+  { value: "51-100", label: "51–100 merchants" },
+  { value: "100-plus", label: "100+ merchants" },
+];
+
+export const RESELLER_MONTHLY_REFERRALS = [
+  { value: "1-5", label: "1–5 referrals" },
+  { value: "6-15", label: "6–15 referrals" },
+  { value: "16-30", label: "16–30 referrals" },
+  { value: "30-plus", label: "30+ referrals" },
+];
+
+export const RESELLER_BANK_ACCOUNT_TYPES = [
+  { value: "savings", label: "Savings Account" },
+  { value: "current", label: "Current Account" },
+];
+
+export const RESELLER_VERIFICATION_STATUSES = {
+  INCOMPLETE: "incomplete",
+  PENDING_REVIEW: "pending_review",
+  APPROVED: "approved",
+  REJECTED: "rejected",
+};
+
 export const RESELLER_PARTNER_TYPE_VALUES = RESELLER_PARTNER_TYPES.map((item) => item.value);
 export const RESELLER_BUSINESS_TYPE_VALUES = RESELLER_BUSINESS_TYPES.map((item) => item.value);
 export const RESELLER_MONTHLY_BUSINESS_COUNT_VALUES = RESELLER_MONTHLY_BUSINESS_COUNTS.map(
   (item) => item.value,
 );
 export const RESELLER_PAYMENT_FAMILIARITY_VALUES = RESELLER_PAYMENT_FAMILIARITY.map(
+  (item) => item.value,
+);
+export const RESELLER_PARTNERSHIP_MODEL_VALUES = RESELLER_PARTNERSHIP_MODELS.map(
+  (item) => item.value,
+);
+export const RESELLER_YEARS_EXPERIENCE_VALUES = RESELLER_YEARS_EXPERIENCE.map((item) => item.value);
+export const RESELLER_MERCHANT_NETWORK_SIZE_VALUES = RESELLER_MERCHANT_NETWORK_SIZES.map(
+  (item) => item.value,
+);
+export const RESELLER_MONTHLY_REFERRAL_VALUES = RESELLER_MONTHLY_REFERRALS.map((item) => item.value);
+export const RESELLER_BANK_ACCOUNT_TYPE_VALUES = RESELLER_BANK_ACCOUNT_TYPES.map(
   (item) => item.value,
 );

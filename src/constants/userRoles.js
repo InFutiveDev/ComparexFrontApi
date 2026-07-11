@@ -9,6 +9,7 @@ export const ACCOUNT_TYPE_TO_ROLE = {
   Merchant: USER_ROLES.MERCHANT,
   Reseller: USER_ROLES.RESELLER,
   "Payment Gateway": USER_ROLES.PAYMENT_PROVIDER,
+  Admin: USER_ROLES.ADMIN,
 };
 
 const ROLE_LABELS = {
@@ -33,11 +34,12 @@ export function formatRoleLabel(role) {
 export function canLoginWithRole(userRole, expectedRole) {
   const actualRole = userRole ?? "user";
 
-  if (actualRole === USER_ROLES.ADMIN) {
+  if (!expectedRole) {
     return true;
   }
 
-  if (!expectedRole) {
+  // Admin tab is admin-only. Admins may also use other tabs.
+  if (actualRole === USER_ROLES.ADMIN) {
     return true;
   }
 

@@ -1,8 +1,10 @@
 import { Router } from "express";
 import { authRouter } from "./auth.js";
+import { expertRouter } from "./expert.js";
 import { merchantRouter } from "./merchant.js";
 import { paymentRouter } from "./payment.js";
 import { resellerRouter } from "./reseller.js";
+import { reviewRouter } from "./review.js";
 import { supportRouter } from "./support.js";
 import { uploadRouter } from "./upload.js";
 
@@ -17,6 +19,8 @@ router.use("/merchant", merchantRouter);
 router.use("/payment", paymentRouter);
 router.use("/reseller", resellerRouter);
 router.use("/support", supportRouter);
+router.use("/expert", expertRouter);
+router.use("/review", reviewRouter);
 router.use("/upload", uploadRouter);
 
 export { router as apiRouter };

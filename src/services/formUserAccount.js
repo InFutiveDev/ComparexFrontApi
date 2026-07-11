@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import { User } from "../models/User.js";
 import { validatePassword } from "../utils/validation.js";
 
-export async function createUserFromForm({ name, email, password, role }) {
+export async function createUserFromForm({ name, email, password, role, status = "active" }) {
   const passwordError = validatePassword(password);
   if (passwordError) {
     return { status: 400, message: passwordError };
@@ -24,6 +24,7 @@ export async function createUserFromForm({ name, email, password, role }) {
     email: normalizedEmail,
     passwordHash,
     role,
+    status,
   });
 
   return { user };
