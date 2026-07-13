@@ -7,10 +7,63 @@ function providers() {
   return getDb().collection(COLLECTION);
 }
 
+function buildFilter({
+  location,
+  category,
+  minSuccessRate,
+  minSettlementScore,
+  search,
+} = {}) {
+  const filter = {};
+
+  if (location) {
+    filter.location = { $regex: location.trim(), $options: "i" };
+  }
+
+  if (category) {
+    filter.$or = [
+      { paymentCapabilities: category },
+      { categories: category },
+    ];
+  }
+
+  if (minSuccessRate !== undefined && minSuccessRate !== null && minSuccessRate !== "") {
+    filter["performance.successRate"] = { $gte: Number(minSuccessRate) };
+  }
+
+  if (minSettlementScore !== undefined && minSettlementScore !== null && minSettlementScore !== "") {
+    filter["performance.settlementScore"] = { $gte: Number(minSettlementScore) };
+  }
+
+  if (search?.trim()) {
+    const q = search.trim();
+    filter.$and = [
+      ...(filter.$and || []),
+      {
+        $or: [
+          { companyName: { $regex: q, $options: "i" } },
+          { email: { $regex: q, $options: "i" } },
+          { contactPerson: { $regex: q, $options: "i" } },
+        ],
+      },
+    ];
+  }
+
+  return filter;
+}
+
 export const PaymentProvider = {
   async create(data) {
     const now = new Date();
     const doc = {
+      location: data.location ?? null,
+      categories: data.categories ?? [],
+      performance: {
+        successRate: data.performance?.successRate ?? 0,
+        settlementScore: data.performance?.settlementScore ?? 0,
+        avgSettlementHours: data.performance?.avgSettlementHours ?? null,
+        totalMerchants: data.performance?.totalMerchants ?? 0,
+      },
       ...data,
       createdAt: now,
       updatedAt: now,
@@ -20,19 +73,34 @@ export const PaymentProvider = {
     return { ...doc, _id: result.insertedId };
   },
 
-  async findAll({ page = 1, limit = 50 } = {}) {
+  async findAll({
+    page = 1,
+    limit = 50,
+    location,
+    category,
+    minSuccessRate,
+    minSettlementScore,
+    search,
+  } = {}) {
     const safePage = Math.max(1, Number(page) || 1);
     const safeLimit = Math.min(100, Math.max(1, Number(limit) || 50));
     const skip = (safePage - 1) * safeLimit;
+    const filter = buildFilter({
+      location,
+      category,
+      minSuccessRate,
+      minSettlementScore,
+      search,
+    });
 
     const [items, total] = await Promise.all([
       providers()
-        .find({})
+        .find(filter)
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(safeLimit)
         .toArray(),
-      providers().countDocuments({}),
+      providers().countDocuments(filter),
     ]);
 
     return { items, total, page: safePage, limit: safeLimit };
@@ -90,8 +158,16 @@ export const PaymentProvider = {
       email: provider.email,
       phone: provider.phone,
       website: provider.website || "",
+      location: provider.location ?? null,
+      categories: provider.categories ?? [],
       paymentCapabilities: provider.paymentCapabilities ?? [],
       partnershipGoals: provider.partnershipGoals ?? [],
+      performance: {
+        successRate: provider.performance?.successRate ?? 0,
+        settlementScore: provider.performance?.settlementScore ?? 0,
+        avgSettlementHours: provider.performance?.avgSettlementHours ?? null,
+        totalMerchants: provider.performance?.totalMerchants ?? 0,
+      },
       consent: provider.consent ?? false,
       formStep: provider.formStep ?? 1,
       source: provider.source ?? null,

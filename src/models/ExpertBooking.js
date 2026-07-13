@@ -85,6 +85,7 @@ export const ExpertBooking = {
       priority: booking.priority ?? null,
       paymentGatewayId: booking.paymentGatewayId ?? null,
       paymentGatewayName: booking.paymentGatewayName ?? null,
+      merchantLeadId: booking.merchantLeadId?.toString?.() ?? booking.merchantLeadId ?? null,
       representativeName: booking.representativeName ?? null,
       representativeTitle: booking.representativeTitle ?? null,
       slotId: booking.slotId ?? null,

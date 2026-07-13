@@ -1,5 +1,6 @@
 import { getDb } from "../mongo.js";
 import { parseObjectId } from "../utils/objectId.js";
+import { LEAD_STATUSES } from "../constants/leadWorkflow.js";
 
 const COLLECTION = "merchant_leads";
 
@@ -7,10 +8,58 @@ function leads() {
   return getDb().collection(COLLECTION);
 }
 
+function buildFilter({
+  status,
+  industry,
+  location,
+  assignedPgId,
+  search,
+} = {}) {
+  const filter = {};
+
+  if (status) {
+    filter.leadStatus = status;
+  }
+
+  if (industry) {
+    filter.industry = industry;
+  }
+
+  if (location) {
+    filter.location = { $regex: location.trim(), $options: "i" };
+  }
+
+  if (assignedPgId) {
+    const objectId = parseObjectId(assignedPgId);
+    if (objectId) {
+      filter.assignedPgId = objectId;
+    }
+  }
+
+  if (search?.trim()) {
+    const q = search.trim();
+    filter.$or = [
+      { businessName: { $regex: q, $options: "i" } },
+      { email: { $regex: q, $options: "i" } },
+      { phone: { $regex: q, $options: "i" } },
+    ];
+  }
+
+  return filter;
+}
+
 export const MerchantLead = {
   async create(data) {
     const now = new Date();
     const doc = {
+      leadStatus: LEAD_STATUSES.NEW,
+      location: data.location ?? null,
+      assignedPgId: null,
+      assignedPgName: null,
+      assignedAt: null,
+      assignedBy: null,
+      expertBookingId: null,
+      qualificationNotes: null,
       ...data,
       createdAt: now,
       updatedAt: now,
@@ -20,19 +69,28 @@ export const MerchantLead = {
     return { ...doc, _id: result.insertedId };
   },
 
-  async findAll({ page = 1, limit = 50 } = {}) {
+  async findAll({
+    page = 1,
+    limit = 50,
+    status,
+    industry,
+    location,
+    assignedPgId,
+    search,
+  } = {}) {
     const safePage = Math.max(1, Number(page) || 1);
     const safeLimit = Math.min(100, Math.max(1, Number(limit) || 50));
     const skip = (safePage - 1) * safeLimit;
+    const filter = buildFilter({ status, industry, location, assignedPgId, search });
 
     const [items, total] = await Promise.all([
       leads()
-        .find({})
+        .find(filter)
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(safeLimit)
         .toArray(),
-      leads().countDocuments({}),
+      leads().countDocuments(filter),
     ]);
 
     return { items, total, page: safePage, limit: safeLimit };
@@ -89,11 +147,20 @@ export const MerchantLead = {
       phone: lead.phone,
       industry: lead.industry ?? null,
       priority: lead.priority ?? null,
+      location: lead.location ?? null,
+      leadStatus: lead.leadStatus ?? LEAD_STATUSES.NEW,
+      qualificationNotes: lead.qualificationNotes ?? null,
+      assignedPgId: lead.assignedPgId?.toString() ?? null,
+      assignedPgName: lead.assignedPgName ?? null,
+      assignedAt: lead.assignedAt ?? null,
+      assignedBy: lead.assignedBy?.toString() ?? null,
+      expertBookingId: lead.expertBookingId?.toString() ?? null,
       formStep: lead.formStep ?? 1,
       source: lead.source ?? null,
       userId: lead.userId?.toString() ?? null,
       accountStatus: lead.accountStatus ?? "inactive",
       createdAt: lead.createdAt,
+      updatedAt: lead.updatedAt ?? null,
     };
   },
 };

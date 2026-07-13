@@ -3,6 +3,7 @@ export const USER_ROLES = {
   RESELLER: "reseller",
   PAYMENT_PROVIDER: "payment_provider",
   ADMIN: "admin",
+  SUB_ADMIN: "sub_admin",
 };
 
 export const ACCOUNT_TYPE_TO_ROLE = {
@@ -10,6 +11,7 @@ export const ACCOUNT_TYPE_TO_ROLE = {
   Reseller: USER_ROLES.RESELLER,
   "Payment Gateway": USER_ROLES.PAYMENT_PROVIDER,
   Admin: USER_ROLES.ADMIN,
+  "Sub Admin": USER_ROLES.SUB_ADMIN,
 };
 
 const ROLE_LABELS = {
@@ -17,6 +19,7 @@ const ROLE_LABELS = {
   [USER_ROLES.RESELLER]: "Reseller",
   [USER_ROLES.PAYMENT_PROVIDER]: "Payment Gateway",
   [USER_ROLES.ADMIN]: "Admin",
+  [USER_ROLES.SUB_ADMIN]: "Sub Admin",
 };
 
 export function resolveLoginRole({ role, accountType }) {
@@ -38,10 +41,18 @@ export function canLoginWithRole(userRole, expectedRole) {
     return true;
   }
 
-  // Admin tab is admin-only. Admins may also use other tabs.
+  // Admin may use any tab. Sub Admin may use the Sub Admin tab.
   if (actualRole === USER_ROLES.ADMIN) {
     return true;
   }
 
+  if (actualRole === USER_ROLES.SUB_ADMIN && expectedRole === USER_ROLES.SUB_ADMIN) {
+    return true;
+  }
+
   return actualRole === expectedRole;
+}
+
+export function isStaffRole(role) {
+  return role === USER_ROLES.ADMIN || role === USER_ROLES.SUB_ADMIN;
 }

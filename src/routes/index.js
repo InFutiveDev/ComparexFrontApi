@@ -3,8 +3,10 @@ import { authRouter } from "./auth.js";
 import { expertRouter } from "./expert.js";
 import { merchantRouter } from "./merchant.js";
 import { paymentRouter } from "./payment.js";
+import { pgExpertRouter } from "./pgExpert.js";
 import { resellerRouter } from "./reseller.js";
 import { reviewRouter } from "./review.js";
+import { subAdminRouter } from "./subAdmin.js";
 import { supportRouter } from "./support.js";
 import { uploadRouter } from "./upload.js";
 
@@ -17,10 +19,12 @@ router.get("/", (_req, res) => {
 router.use("/auth", authRouter);
 router.use("/merchant", merchantRouter);
 router.use("/payment", paymentRouter);
+router.use("/pg-experts", pgExpertRouter);
 router.use("/reseller", resellerRouter);
 router.use("/support", supportRouter);
 router.use("/expert", expertRouter);
 router.use("/review", reviewRouter);
+router.use("/sub-admin", subAdminRouter);
 router.use("/upload", uploadRouter);
 
 export { router as apiRouter };

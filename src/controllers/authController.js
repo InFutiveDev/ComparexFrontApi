@@ -14,12 +14,15 @@ const REGISTER_ACCOUNT_TYPE_TO_ROLE = {
   merchant: USER_ROLES.MERCHANT,
   reseller: USER_ROLES.RESELLER,
   "payment-gateway": USER_ROLES.PAYMENT_PROVIDER,
-  "payment_provider": USER_ROLES.PAYMENT_PROVIDER,
+  payment_provider: USER_ROLES.PAYMENT_PROVIDER,
   admin: USER_ROLES.ADMIN,
+  "sub-admin": USER_ROLES.SUB_ADMIN,
+  sub_admin: USER_ROLES.SUB_ADMIN,
   Merchant: USER_ROLES.MERCHANT,
   Reseller: USER_ROLES.RESELLER,
   "Payment Gateway": USER_ROLES.PAYMENT_PROVIDER,
   Admin: USER_ROLES.ADMIN,
+  "Sub Admin": USER_ROLES.SUB_ADMIN,
 };
 
 export async function register(req, res) {
@@ -41,7 +44,7 @@ export async function register(req, res) {
 
     if (!resolvedRole) {
       return res.status(400).json({
-        message: "Please select a valid account type (Merchant, Reseller, Payment Gateway, or Admin)",
+        message: "Please select a valid account type (Merchant, Reseller, Payment Gateway, Admin, or Sub Admin)",
       });
     }
 

@@ -5,6 +5,8 @@ import {
   MERCHANT_PRIORITY_VALUES,
 } from "../constants/merchantForm.js";
 import { MerchantLead } from "../models/MerchantLead.js";
+import { LeadActivity } from "../models/LeadActivity.js";
+import { LEAD_ACTIVITY_TYPES } from "../constants/leadWorkflow.js";
 import { enrichItemsWithAccountStatus, setUserAccountStatus } from "../services/accountStatus.js";
 import { getPhoneDigits, validateEmail, validateMobilePhone } from "../utils/validation.js";
 
@@ -118,6 +120,15 @@ export async function submitMerchantForm(req, res) {
       source: "merchant",
       userId: null,
       formStep: 1,
+    });
+
+    await LeadActivity.create({
+      leadId: lead._id,
+      type: LEAD_ACTIVITY_TYPES.CREATED,
+      message: "Merchant lead submitted",
+      actorName: businessName.trim(),
+      actorRole: "merchant",
+      meta: { source: "merchant", formStep: 1 },
     });
 
     const sanitized = MerchantLead.sanitize({

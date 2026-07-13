@@ -21,6 +21,10 @@
     {
       "key": "id",
       "value": ""
+    },
+    {
+      "key": "pgId",
+      "value": ""
     }
   ],
   "item": [
@@ -692,6 +696,332 @@
               "path": ["api", "support", "{{id}}"]
             },
             "description": "Delete a merchant support request by id. Set `id` from Get All Merchant Support response."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "PG Expert Representatives",
+      "item": [
+        {
+          "name": "Get Options",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/pg-experts/options",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "pg-experts", "options"]
+            },
+            "description": "PG domain options (PhonePe, Razorpay, etc.) and status values."
+          },
+          "response": []
+        },
+        {
+          "name": "List Representatives",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/pg-experts?page=1&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "pg-experts"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "50" },
+                { "key": "pgDomain", "value": "Razorpay", "disabled": true },
+                { "key": "search", "value": "", "disabled": true },
+                { "key": "status", "value": "active", "disabled": true }
+              ]
+            },
+            "description": "List PG expert representatives. Sub Admin / Admin only."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Representative",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Priya Sharma\",\n  \"email\": \"priya.razorpay@example.com\",\n  \"phone\": \"9876543210\",\n  \"pgDomain\": \"Razorpay\",\n  \"title\": \"Partnership Manager\",\n  \"notes\": \"Handles mid-market merchants\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/pg-experts",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "pg-experts"]
+            },
+            "description": "Create a PG expert representative. Required: name, email, phone, pgDomain."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Representative By Id",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/pg-experts/{{id}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "pg-experts", "{{id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Representative",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"9988776655\",\n  \"status\": \"active\",\n  \"title\": \"Senior Partnership Manager\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/pg-experts/{{id}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "pg-experts", "{{id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Representative",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/pg-experts/{{id}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "pg-experts", "{{id}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Sub Admin",
+      "item": [
+        {
+          "name": "Get Options",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/sub-admin/options",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "sub-admin", "options"]
+            },
+            "description": "Lead statuses, industries, priorities, and assignment actions for Sub Admin panel."
+          },
+          "response": []
+        },
+        {
+          "name": "List Leads",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/sub-admin/leads?page=1&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "sub-admin", "leads"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "50" },
+                { "key": "status", "value": "", "disabled": true },
+                { "key": "industry", "value": "", "disabled": true },
+                { "key": "location", "value": "", "disabled": true },
+                { "key": "search", "value": "", "disabled": true }
+              ]
+            },
+            "description": "FR-SA-01 / FR-SA-05 — list and filter merchant leads. Sub Admin or Admin only."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Lead Detail + Timeline",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/sub-admin/leads/{{id}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "sub-admin", "leads", "{{id}}"]
+            },
+            "description": "FR-SA-03 — lead details with activity timeline."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Lead Status",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"qualified\",\n  \"notes\": \"Good fit for UPI-heavy ecommerce\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/sub-admin/leads/{{id}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "sub-admin", "leads", "{{id}}", "status"]
+            },
+            "description": "FR-SA-02 — status: new | in_review | qualified | rejected | assigned | expert_booked"
+          },
+          "response": []
+        },
+        {
+          "name": "List Assignable Payment Gateways",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/sub-admin/payment-gateways?page=1&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "sub-admin", "payment-gateways"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "50" },
+                { "key": "location", "value": "", "disabled": true },
+                { "key": "category", "value": "online-payment", "disabled": true },
+                { "key": "minSuccessRate", "value": "90", "disabled": true },
+                { "key": "minSettlementScore", "value": "70", "disabled": true }
+              ]
+            },
+            "description": "FR-SA-05 — filter PGs by location, category/capability, and performance metrics."
+          },
+          "response": []
+        },
+        {
+          "name": "Assign Lead to PG",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"paymentGatewayId\": \"{{pgId}}\",\n  \"notes\": \"Assigned after qualification\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/sub-admin/leads/{{id}}/assign",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "sub-admin", "leads", "{{id}}", "assign"]
+            },
+            "description": "FR-SA-04 / FR-SA-06 — assign qualified lead to PG and notify the PG."
+          },
+          "response": []
+        },
+        {
+          "name": "Book Talk to Expert",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"preferredDate\": \"2026-07-20\",\n  \"preferredTime\": \"11:00\",\n  \"timezone\": \"Asia/Kolkata\",\n  \"notes\": \"Needs settlement guidance\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/sub-admin/leads/{{id}}/talk-to-expert",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "sub-admin", "leads", "{{id}}", "talk-to-expert"]
+            },
+            "description": "FR-SA-04 — book Talk to Expert from a merchant lead."
+          },
+          "response": []
+        },
+        {
+          "name": "Bulk Upload Leads to PG",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "paymentGatewayId", "value": "{{pgId}}", "type": "text" },
+                { "key": "file", "type": "file", "src": [] }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/sub-admin/leads/bulk-upload",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "sub-admin", "leads", "bulk-upload"]
+            },
+            "description": "FR-SA-04 — CSV headers: businessName,email,phone,industry,priority,location. Assigns all rows to the given PG."
+          },
+          "response": []
+        },
+        {
+          "name": "List PG Notifications",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/sub-admin/notifications?paymentGatewayId={{pgId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "sub-admin", "notifications"],
+              "query": [
+                { "key": "paymentGatewayId", "value": "{{pgId}}" }
+              ]
+            },
+            "description": "FR-SA-06 — view notifications sent to a payment gateway."
           },
           "response": []
         }
