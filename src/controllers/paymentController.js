@@ -4,10 +4,28 @@ import {
   PAYMENT_PARTNERSHIP_GOAL_VALUES,
   PAYMENT_PARTNERSHIP_GOALS,
 } from "../constants/paymentForm.js";
+import { PG_VERIFICATION_STATUSES } from "../constants/paymentOnboarding.js";
 import { PaymentProvider } from "../models/PaymentProvider.js";
 import { createUserFromForm } from "../services/formUserAccount.js";
 import { enrichItemsWithAccountStatus, setUserAccountStatus } from "../services/accountStatus.js";
+import {
+  computePgOnboardingCompletion,
+  resolvePgVerificationStatus,
+  sanitizeOnboardingPayload,
+} from "../utils/pgOnboarding.js";
 import { getPhoneDigits, validateEmail, validateMobilePhone } from "../utils/validation.js";
+
+function normalizeAdminFileMeta(file) {
+  if (!file || typeof file !== "object") return null;
+  if (!file.key && !file.url && !file.fileName) return null;
+  return {
+    key: file.key || null,
+    url: file.url || null,
+    fileName: file.fileName || null,
+    mimeType: file.mimeType || null,
+    size: file.size || null,
+  };
+}
 
 export function getFormOptions(_req, res) {
   return res.json({
@@ -68,6 +86,90 @@ export async function getPaymentGatewayById(req, res) {
   } catch (error) {
     console.error("Get payment gateway error:", error);
     return res.status(500).json({ message: "Failed to fetch payment gateway" });
+  }
+}
+
+export async function getMyPaymentProfile(req, res) {
+  try {
+    const provider = await PaymentProvider.findByUserId(req.userId);
+
+    if (!provider) {
+      return res.status(404).json({ message: "Payment gateway profile not found" });
+    }
+
+    const [enriched] = await enrichItemsWithAccountStatus([provider]);
+
+    return res.json({
+      paymentGateway: PaymentProvider.sanitize(enriched),
+    });
+  } catch (error) {
+    console.error("Get my payment profile error:", error);
+    return res.status(500).json({ message: "Failed to fetch payment gateway profile" });
+  }
+}
+
+export async function updateMyPaymentProfile(req, res) {
+  try {
+    const provider = await PaymentProvider.findByUserId(req.userId);
+
+    if (!provider) {
+      return res.status(404).json({ message: "Payment gateway profile not found" });
+    }
+
+    if (provider.verificationStatus === PG_VERIFICATION_STATUSES.APPROVED) {
+      return res.status(400).json({
+        message: "Your onboarding profile is already approved and cannot be edited",
+      });
+    }
+
+    const { section, submit, onboarding: onboardingBody, ...flatFields } = req.body;
+    const updates = {};
+
+    if (section === "onboarding" || section === "draft" || section === "submit" || !section) {
+      const incoming =
+        onboardingBody && typeof onboardingBody === "object" ? onboardingBody : flatFields;
+
+      const nextOnboarding = sanitizeOnboardingPayload(incoming, {
+        mergeWith: provider.onboarding || {},
+      });
+
+      updates.onboarding = nextOnboarding;
+
+      const profile = computePgOnboardingCompletion({ onboarding: nextOnboarding });
+      const shouldSubmit = Boolean(submit) || section === "submit";
+
+      if (shouldSubmit) {
+        updates.verificationStatus = PG_VERIFICATION_STATUSES.PENDING_REVIEW;
+        updates.onboardingSubmittedAt = new Date();
+      } else {
+        updates.verificationStatus = resolvePgVerificationStatus(
+          { ...provider, onboarding: nextOnboarding },
+          profile,
+        );
+      }
+    } else {
+      return res.status(400).json({ message: "Unsupported profile section" });
+    }
+
+    const result = await PaymentProvider.updateById(provider._id, updates);
+
+    if (result.invalid || !result.updated) {
+      return res.status(404).json({ message: "Payment gateway profile not found" });
+    }
+
+    const [enriched] = await enrichItemsWithAccountStatus([result.updated]);
+    const sanitized = PaymentProvider.sanitize(enriched);
+
+    return res.json({
+      message:
+        updates.verificationStatus === PG_VERIFICATION_STATUSES.PENDING_REVIEW
+          ? "Onboarding submitted for review"
+          : "Onboarding progress saved",
+      paymentGateway: sanitized,
+    });
+  } catch (error) {
+    console.error("Update my payment profile error:", error);
+    return res.status(500).json({ message: "Failed to update payment gateway profile" });
   }
 }
 
@@ -140,6 +242,12 @@ export async function submitPaymentForm(req, res) {
       source: "payment",
       userId: userResult.user._id,
       formStep: 1,
+      onboarding: {
+        brandName: companyName.trim(),
+        legalEntityName: companyName.trim(),
+        websiteUrl: website?.trim() || "",
+      },
+      verificationStatus: "incomplete",
     });
 
     const sanitized = PaymentProvider.sanitize({
@@ -304,5 +412,200 @@ export async function updatePaymentAccountStatus(req, res) {
   } catch (error) {
     console.error("Update payment account status error:", error);
     return res.status(500).json({ message: "Failed to update account status" });
+  }
+}
+
+/** FR-MA-04 / FR-MA-06 — Master Admin onboard Payment Gateway with optional documents */
+export async function adminOnboardPaymentGateway(req, res) {
+  try {
+    const {
+      companyName,
+      contactPerson,
+      designation,
+      email,
+      phone,
+      website,
+      password,
+      companyLogo,
+      onboardingChecklist,
+      accountStatus = "active",
+      verificationStatus = PG_VERIFICATION_STATUSES.PENDING_REVIEW,
+      activateAccount = true,
+    } = req.body;
+
+    if (
+      !companyName?.trim() ||
+      !contactPerson?.trim() ||
+      !email?.trim() ||
+      !phone?.trim() ||
+      !password
+    ) {
+      return res.status(400).json({
+        message: "Company name, contact person, email, phone, and password are required",
+      });
+    }
+
+    const emailError = validateEmail(email);
+    if (emailError) {
+      return res.status(400).json({ message: emailError });
+    }
+
+    const phoneError = validateMobilePhone(phone);
+    if (phoneError) {
+      return res.status(400).json({ message: phoneError });
+    }
+
+    const allowedVerification = Object.values(PG_VERIFICATION_STATUSES);
+    if (!allowedVerification.includes(verificationStatus)) {
+      return res.status(400).json({
+        message: `verificationStatus must be one of: ${allowedVerification.join(", ")}`,
+      });
+    }
+
+    const userResult = await createUserFromForm({
+      name: contactPerson.trim(),
+      email,
+      password,
+      role: "payment_provider",
+      status: activateAccount || accountStatus === "active" ? "active" : "inactive",
+    });
+
+    if (userResult.message) {
+      return res.status(userResult.status).json({ message: userResult.message });
+    }
+
+    const onboarding = sanitizeOnboardingPayload({
+      brandName: companyName.trim(),
+      legalEntityName: companyName.trim(),
+      websiteUrl: website?.trim() || "",
+      companyLogo: normalizeAdminFileMeta(companyLogo),
+      onboardingChecklist: normalizeAdminFileMeta(onboardingChecklist),
+    });
+
+    const provider = await PaymentProvider.create({
+      companyName: companyName.trim(),
+      contactPerson: contactPerson.trim(),
+      designation: designation?.trim() || "Not specified",
+      email: email.trim().toLowerCase(),
+      phone: getPhoneDigits(phone),
+      website: website?.trim() || "",
+      paymentCapabilities: [],
+      partnershipGoals: [],
+      consent: true,
+      source: "admin",
+      userId: userResult.user._id,
+      formStep: 1,
+      onboarding,
+      verificationStatus,
+      onboardingSubmittedAt:
+        verificationStatus === PG_VERIFICATION_STATUSES.PENDING_REVIEW ||
+        verificationStatus === PG_VERIFICATION_STATUSES.APPROVED
+          ? new Date()
+          : null,
+    });
+
+    const sanitized = PaymentProvider.sanitize({
+      ...provider,
+      accountStatus: userResult.user.status ?? "active",
+    });
+
+    return res.status(201).json({
+      id: sanitized.id,
+      message: "Payment gateway onboarded successfully",
+      paymentGateway: sanitized,
+    });
+  } catch (error) {
+    console.error("Admin onboard payment gateway error:", error);
+    return res.status(500).json({ message: "Failed to onboard payment gateway" });
+  }
+}
+
+/** FR-MA-06 — update onboarding documents on an existing PG */
+export async function updatePaymentOnboardingDocuments(req, res) {
+  try {
+    const provider = await PaymentProvider.findById(req.params.id);
+    if (!provider) {
+      return res.status(404).json({ message: "Payment gateway not found" });
+    }
+
+    const { companyLogo, onboardingChecklist } = req.body;
+    const nextOnboarding = sanitizeOnboardingPayload(
+      {
+        companyLogo:
+          companyLogo === undefined
+            ? provider.onboarding?.companyLogo
+            : normalizeAdminFileMeta(companyLogo),
+        onboardingChecklist:
+          onboardingChecklist === undefined
+            ? provider.onboarding?.onboardingChecklist
+            : normalizeAdminFileMeta(onboardingChecklist),
+      },
+      { mergeWith: provider.onboarding || {} },
+    );
+
+    const result = await PaymentProvider.updateById(provider._id, {
+      onboarding: nextOnboarding,
+    });
+
+    if (!result.updated) {
+      return res.status(404).json({ message: "Payment gateway not found" });
+    }
+
+    const [enriched] = await enrichItemsWithAccountStatus([result.updated]);
+
+    return res.json({
+      message: "Onboarding documents updated",
+      paymentGateway: PaymentProvider.sanitize(enriched),
+    });
+  } catch (error) {
+    console.error("Update payment documents error:", error);
+    return res.status(500).json({ message: "Failed to update onboarding documents" });
+  }
+}
+
+/** FR-MA-04 / FR-MA-06 — verify PG onboarding */
+export async function updatePaymentVerificationStatus(req, res) {
+  try {
+    const provider = await PaymentProvider.findById(req.params.id);
+    if (!provider) {
+      return res.status(404).json({ message: "Payment gateway not found" });
+    }
+
+    const { status } = req.body;
+    const allowed = [
+      PG_VERIFICATION_STATUSES.PENDING_REVIEW,
+      PG_VERIFICATION_STATUSES.APPROVED,
+      PG_VERIFICATION_STATUSES.REJECTED,
+    ];
+
+    if (!allowed.includes(status)) {
+      return res.status(400).json({
+        message: "Status must be pending_review, approved, or rejected",
+      });
+    }
+
+    const result = await PaymentProvider.updateById(provider._id, {
+      verificationStatus: status,
+      onboardingSubmittedAt:
+        provider.onboardingSubmittedAt ||
+        (status === PG_VERIFICATION_STATUSES.PENDING_REVIEW ||
+        status === PG_VERIFICATION_STATUSES.APPROVED
+          ? new Date()
+          : null),
+    });
+
+    if (!result.updated) {
+      return res.status(404).json({ message: "Payment gateway not found" });
+    }
+
+    const [enriched] = await enrichItemsWithAccountStatus([result.updated]);
+
+    return res.json({
+      message: `Verification marked as ${status.replaceAll("_", " ")}`,
+      paymentGateway: PaymentProvider.sanitize(enriched),
+    });
+  } catch (error) {
+    console.error("Update payment verification error:", error);
+    return res.status(500).json({ message: "Failed to update verification status" });
   }
 }

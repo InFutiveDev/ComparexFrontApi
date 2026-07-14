@@ -1,5 +1,11 @@
 import { getDb } from "../mongo.js";
 import { parseObjectId } from "../utils/objectId.js";
+import {
+  computePgOnboardingCompletion,
+  emptyPgOnboarding,
+  resolvePgVerificationStatus,
+  sanitizeOnboardingPayload,
+} from "../utils/pgOnboarding.js";
 
 const COLLECTION = "payment_providers";
 
@@ -125,6 +131,15 @@ export const PaymentProvider = {
     return providers().findOne({ _id: objectId });
   },
 
+  findByUserId(userId) {
+    const objectId = parseObjectId(userId);
+    if (!objectId) {
+      return null;
+    }
+
+    return providers().findOne({ userId: objectId });
+  },
+
   async updateById(id, data) {
     const objectId = parseObjectId(id);
     if (!objectId) {
@@ -150,6 +165,12 @@ export const PaymentProvider = {
   },
 
   sanitize(provider) {
+    const onboarding = sanitizeOnboardingPayload(provider.onboarding || emptyPgOnboarding());
+    const profileCompletion = computePgOnboardingCompletion({ onboarding });
+    const verificationStatus =
+      provider.verificationStatus ||
+      resolvePgVerificationStatus(provider, profileCompletion);
+
     return {
       id: provider._id.toString(),
       companyName: provider.companyName,
@@ -173,7 +194,13 @@ export const PaymentProvider = {
       source: provider.source ?? null,
       userId: provider.userId?.toString() ?? null,
       accountStatus: provider.accountStatus ?? "inactive",
+      onboarding,
+      verificationStatus,
+      profileCompletionPercent: profileCompletion.percent,
+      profileCompletion,
+      onboardingSubmittedAt: provider.onboardingSubmittedAt ?? null,
       createdAt: provider.createdAt,
+      updatedAt: provider.updatedAt ?? null,
     };
   },
 };

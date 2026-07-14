@@ -646,3 +646,198 @@ export async function updateResellerVerificationStatus(req, res) {
     return res.status(500).json({ message: "Failed to update verification status" });
   }
 }
+
+/** FR-MA-05 / FR-MA-06 — Master Admin onboard reseller with optional KYC documents */
+export async function adminOnboardReseller(req, res) {
+  try {
+    const {
+      fullName,
+      businessName,
+      phone,
+      email,
+      website,
+      password,
+      panCard,
+      aadhaarId,
+      gstCertificate,
+      bankAccountHolderName,
+      bankName,
+      bankAccountNumber,
+      bankIfsc,
+      bankBranch,
+      bankAccountType,
+      bankProof,
+      cityState,
+      partnershipModel,
+      yearsExperience,
+      verificationStatus = RESELLER_VERIFICATION_STATUSES.PENDING_REVIEW,
+      activateAccount = true,
+    } = req.body;
+
+    if (!fullName?.trim() || !businessName?.trim() || !phone?.trim() || !email?.trim() || !password) {
+      return res.status(400).json({
+        message: "Full name, business name, phone, email, and password are required",
+      });
+    }
+
+    const emailError = validateEmail(email);
+    if (emailError) {
+      return res.status(400).json({ message: emailError });
+    }
+
+    const phoneError = validateMobilePhone(phone);
+    if (phoneError) {
+      return res.status(400).json({ message: phoneError });
+    }
+
+    const allowedVerification = Object.values(RESELLER_VERIFICATION_STATUSES);
+    if (!allowedVerification.includes(verificationStatus)) {
+      return res.status(400).json({
+        message: `verificationStatus must be one of: ${allowedVerification.join(", ")}`,
+      });
+    }
+
+    if (partnershipModel && !RESELLER_PARTNERSHIP_MODEL_VALUES.includes(partnershipModel)) {
+      return res.status(400).json({ message: "Invalid partnership model" });
+    }
+    if (yearsExperience && !RESELLER_YEARS_EXPERIENCE_VALUES.includes(yearsExperience)) {
+      return res.status(400).json({ message: "Invalid years of experience" });
+    }
+    if (bankAccountType && !RESELLER_BANK_ACCOUNT_TYPE_VALUES.includes(bankAccountType)) {
+      return res.status(400).json({ message: "Invalid bank account type" });
+    }
+
+    const userResult = await createUserFromForm({
+      name: fullName.trim(),
+      email,
+      password,
+      role: "reseller",
+      status: activateAccount ? "active" : "inactive",
+    });
+
+    if (userResult.message) {
+      return res.status(userResult.status).json({ message: userResult.message });
+    }
+
+    const partner = await ResellerPartner.create({
+      fullName: fullName.trim(),
+      businessName: businessName.trim(),
+      email: email.trim().toLowerCase(),
+      phone: getPhoneDigits(phone),
+      website: website?.trim() || "",
+      partnerType: null,
+      businessTypes: [],
+      monthlyBusinessCount: null,
+      paymentFamiliarity: null,
+      consent: true,
+      partnershipModel: partnershipModel || null,
+      cityState: cityState?.trim() || "",
+      yearsExperience: yearsExperience || null,
+      merchantNetworkSize: null,
+      monthlyReferrals: null,
+      panCard: panCard?.trim()?.toUpperCase() || "",
+      aadhaarId: aadhaarId?.trim() || "",
+      gstCertificate: normalizeFileMeta(gstCertificate),
+      bankAccountHolderName: bankAccountHolderName?.trim() || "",
+      bankName: bankName?.trim() || "",
+      bankAccountNumber: bankAccountNumber?.trim() || "",
+      bankIfsc: bankIfsc?.trim()?.toUpperCase() || "",
+      bankBranch: bankBranch?.trim() || "",
+      bankAccountType: bankAccountType || null,
+      bankProof: normalizeFileMeta(bankProof),
+      resellerAgreement: true,
+      commissionPolicy: true,
+      verificationStatus,
+      source: "admin",
+      userId: userResult.user._id,
+      formStep: 3,
+    });
+
+    const sanitized = ResellerPartner.sanitize({
+      ...partner,
+      accountStatus: userResult.user.status ?? "active",
+    });
+
+    return res.status(201).json({
+      id: sanitized.id,
+      message: "Reseller onboarded successfully",
+      reseller: sanitized,
+    });
+  } catch (error) {
+    console.error("Admin onboard reseller error:", error);
+    return res.status(500).json({ message: "Failed to onboard reseller" });
+  }
+}
+
+/** FR-MA-06 — attach/replace KYC documents for an existing reseller */
+export async function updateResellerOnboardingDocuments(req, res) {
+  try {
+    const partner = await ResellerPartner.findById(req.params.id);
+    if (!partner) {
+      return res.status(404).json({ message: "Reseller not found" });
+    }
+
+    const {
+      panCard,
+      aadhaarId,
+      gstCertificate,
+      bankProof,
+      bankAccountHolderName,
+      bankName,
+      bankAccountNumber,
+      bankIfsc,
+      bankBranch,
+      bankAccountType,
+    } = req.body;
+
+    const updates = {};
+
+    if (panCard !== undefined) updates.panCard = String(panCard || "").trim().toUpperCase();
+    if (aadhaarId !== undefined) updates.aadhaarId = String(aadhaarId || "").trim();
+    if (gstCertificate !== undefined) updates.gstCertificate = normalizeFileMeta(gstCertificate);
+    if (bankProof !== undefined) updates.bankProof = normalizeFileMeta(bankProof);
+    if (bankAccountHolderName !== undefined) {
+      updates.bankAccountHolderName = String(bankAccountHolderName || "").trim();
+    }
+    if (bankName !== undefined) updates.bankName = String(bankName || "").trim();
+    if (bankAccountNumber !== undefined) {
+      updates.bankAccountNumber = String(bankAccountNumber || "").trim();
+    }
+    if (bankIfsc !== undefined) updates.bankIfsc = String(bankIfsc || "").trim().toUpperCase();
+    if (bankBranch !== undefined) updates.bankBranch = String(bankBranch || "").trim();
+    if (bankAccountType !== undefined && bankAccountType !== "") {
+      if (!RESELLER_BANK_ACCOUNT_TYPE_VALUES.includes(bankAccountType)) {
+        return res.status(400).json({ message: "Invalid bank account type" });
+      }
+      updates.bankAccountType = bankAccountType;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ message: "No document fields to update" });
+    }
+
+    const next = { ...partner, ...updates };
+    const profile = computeResellerProfileCompletion(next);
+    if (
+      partner.verificationStatus !== RESELLER_VERIFICATION_STATUSES.APPROVED &&
+      partner.verificationStatus !== RESELLER_VERIFICATION_STATUSES.REJECTED
+    ) {
+      updates.verificationStatus = resolveVerificationStatus(partner, profile);
+    }
+
+    const result = await ResellerPartner.updateById(partner._id, updates);
+    if (!result.updated) {
+      return res.status(404).json({ message: "Reseller not found" });
+    }
+
+    const [enriched] = await enrichItemsWithAccountStatus([result.updated]);
+
+    return res.json({
+      message: "Reseller onboarding documents updated",
+      reseller: ResellerPartner.sanitize(enriched),
+    });
+  } catch (error) {
+    console.error("Update reseller documents error:", error);
+    return res.status(500).json({ message: "Failed to update reseller documents" });
+  }
+}

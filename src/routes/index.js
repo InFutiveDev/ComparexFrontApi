@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { adminSettingsRouter } from "./adminSettings.js";
 import { authRouter } from "./auth.js";
 import { expertRouter } from "./expert.js";
 import { merchantRouter } from "./merchant.js";
@@ -17,6 +18,7 @@ router.get("/", (_req, res) => {
 });
 
 router.use("/auth", authRouter);
+router.use("/admin/settings", adminSettingsRouter);
 router.use("/merchant", merchantRouter);
 router.use("/payment", paymentRouter);
 router.use("/pg-experts", pgExpertRouter);

@@ -456,13 +456,9 @@ export async function listPgNotifications(req, res) {
   try {
     const { page, limit, paymentGatewayId } = req.query;
 
-    if (!paymentGatewayId) {
-      return res.status(400).json({ message: "paymentGatewayId is required" });
-    }
-
     const result = await Notification.findByRecipient({
       recipientType: "payment_provider",
-      recipientId: paymentGatewayId,
+      recipientId: paymentGatewayId || undefined,
       page,
       limit,
     });
