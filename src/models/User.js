@@ -31,6 +31,10 @@ export const User = {
       .toArray();
   },
 
+  findByRole(role) {
+    return users().find({ role, status: { $ne: "inactive" } }).toArray();
+  },
+
   async create({ name, email, passwordHash, role = "user", status = "inactive" }) {
     const now = new Date();
     const doc = {

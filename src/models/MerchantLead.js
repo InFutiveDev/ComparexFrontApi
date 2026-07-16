@@ -1,6 +1,6 @@
 import { getDb } from "../mongo.js";
 import { parseObjectId } from "../utils/objectId.js";
-import { LEAD_STATUSES } from "../constants/leadWorkflow.js";
+import { LEAD_STATUSES, PG_LEAD_STATUSES } from "../constants/leadWorkflow.js";
 
 const COLLECTION = "merchant_leads";
 
@@ -58,6 +58,11 @@ export const MerchantLead = {
       assignedPgName: null,
       assignedAt: null,
       assignedBy: null,
+      registeredViaPgId: null,
+      pgLeadStatus: PG_LEAD_STATUSES.PENDING,
+      pgRemarks: null,
+      pgStatusUpdatedAt: null,
+      pgStatusUpdatedBy: null,
       expertBookingId: null,
       qualificationNotes: null,
       ...data,
@@ -94,6 +99,79 @@ export const MerchantLead = {
     ]);
 
     return { items, total, page: safePage, limit: safeLimit };
+  },
+
+  async findAllForPg(
+    pgId,
+    { page = 1, limit = 50, pgLeadStatus, source, search, exportAll = false } = {},
+  ) {
+    const objectId = parseObjectId(pgId);
+    if (!objectId) return { items: [], total: 0, page: 1, limit: Number(limit) || 50 };
+
+    const safePage = Math.max(1, Number(page) || 1);
+    const safeLimit = exportAll
+      ? 10000
+      : Math.min(100, Math.max(1, Number(limit) || 50));
+    const skip = exportAll ? 0 : (safePage - 1) * safeLimit;
+    const filter = {
+      $and: [
+        {
+          $or: [
+            { assignedPgId: objectId },
+            { registeredViaPgId: objectId },
+          ],
+        },
+      ],
+    };
+
+    if (pgLeadStatus === PG_LEAD_STATUSES.PENDING) {
+      filter.$and.push({
+        $or: [
+          { pgLeadStatus: PG_LEAD_STATUSES.PENDING },
+          { pgLeadStatus: { $exists: false } },
+          { pgLeadStatus: null },
+        ],
+      });
+    } else if (pgLeadStatus) {
+      filter.pgLeadStatus = pgLeadStatus;
+    }
+    if (source) filter.source = source;
+    if (search?.trim()) {
+      const q = search.trim();
+      filter.$and.push({
+        $or: [
+          { businessName: { $regex: q, $options: "i" } },
+          { email: { $regex: q, $options: "i" } },
+          { phone: { $regex: q, $options: "i" } },
+        ],
+      });
+    }
+
+    const [items, total] = await Promise.all([
+      leads()
+        .find(filter)
+        .sort({ assignedAt: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(safeLimit)
+        .toArray(),
+      leads().countDocuments(filter),
+    ]);
+
+    return { items, total, page: safePage, limit: safeLimit };
+  },
+
+  async findByIdForPg(id, pgId) {
+    const leadId = parseObjectId(id);
+    const providerId = parseObjectId(pgId);
+    if (!leadId || !providerId) return null;
+
+    return leads().findOne({
+      _id: leadId,
+      $or: [
+        { assignedPgId: providerId },
+        { registeredViaPgId: providerId },
+      ],
+    });
   },
 
   async deleteById(id) {
@@ -154,6 +232,11 @@ export const MerchantLead = {
       assignedPgName: lead.assignedPgName ?? null,
       assignedAt: lead.assignedAt ?? null,
       assignedBy: lead.assignedBy?.toString() ?? null,
+      registeredViaPgId: lead.registeredViaPgId?.toString?.() ?? null,
+      pgLeadStatus: lead.pgLeadStatus ?? PG_LEAD_STATUSES.PENDING,
+      pgRemarks: lead.pgRemarks ?? null,
+      pgStatusUpdatedAt: lead.pgStatusUpdatedAt ?? null,
+      pgStatusUpdatedBy: lead.pgStatusUpdatedBy?.toString?.() ?? null,
       expertBookingId: lead.expertBookingId?.toString() ?? null,
       formStep: lead.formStep ?? 1,
       source: lead.source ?? null,

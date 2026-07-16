@@ -21,17 +21,31 @@ export const Notification = {
     return { ...doc, _id: result.insertedId };
   },
 
-  async findByRecipient({ recipientType, recipientId, page = 1, limit = 50 } = {}) {
+  async findByRecipient({
+    recipientType,
+    recipientId,
+    recipientEmail,
+    page = 1,
+    limit = 50,
+  } = {}) {
     const safePage = Math.max(1, Number(page) || 1);
     const safeLimit = Math.min(100, Math.max(1, Number(limit) || 50));
     const skip = (safePage - 1) * safeLimit;
     const filter = {};
 
     if (recipientType) filter.recipientType = recipientType;
+    const recipientFilters = [];
     if (recipientId) {
       const objectId = parseObjectId(recipientId);
-      if (objectId) filter.recipientId = objectId;
+      if (objectId) recipientFilters.push({ recipientId: objectId });
     }
+    if (recipientEmail?.trim()) {
+      recipientFilters.push({
+        recipientEmail: recipientEmail.trim().toLowerCase(),
+      });
+    }
+    if (recipientFilters.length === 1) Object.assign(filter, recipientFilters[0]);
+    if (recipientFilters.length > 1) filter.$or = recipientFilters;
 
     const [items, total] = await Promise.all([
       notifications()

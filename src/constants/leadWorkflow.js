@@ -27,4 +27,19 @@ export const LEAD_ACTIVITY_TYPES = {
   BULK_UPLOADED: "bulk_uploaded",
   NOTE_ADDED: "note_added",
   PG_NOTIFIED: "pg_notified",
+  PG_STATUS_UPDATED: "pg_status_updated",
+};
+
+export const PG_LEAD_STATUSES = {
+  PENDING: "pending",
+  LIVE: "live",
+  REJECTED: "rejected",
+};
+
+export const PG_LEAD_STATUS_VALUES = Object.values(PG_LEAD_STATUSES);
+
+export const PG_LEAD_STATUS_LABELS = {
+  [PG_LEAD_STATUSES.PENDING]: "Pending",
+  [PG_LEAD_STATUSES.LIVE]: "Live",
+  [PG_LEAD_STATUSES.REJECTED]: "Rejected",
 };

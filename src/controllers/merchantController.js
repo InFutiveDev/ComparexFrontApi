@@ -5,6 +5,7 @@ import {
   MERCHANT_PRIORITY_VALUES,
 } from "../constants/merchantForm.js";
 import { MerchantLead } from "../models/MerchantLead.js";
+import { PaymentProvider } from "../models/PaymentProvider.js";
 import { LeadActivity } from "../models/LeadActivity.js";
 import { LEAD_ACTIVITY_TYPES } from "../constants/leadWorkflow.js";
 import { enrichItemsWithAccountStatus, setUserAccountStatus } from "../services/accountStatus.js";
@@ -93,7 +94,7 @@ export async function deleteMerchantGateway(req, res) {
 
 export async function submitMerchantForm(req, res) {
   try {
-    const { businessName, email, phone } = req.body;
+    const { businessName, email, phone, pgId } = req.body;
 
     if (!businessName?.trim() || !email?.trim() || !phone?.trim()) {
       return res.status(400).json({
@@ -111,24 +112,43 @@ export async function submitMerchantForm(req, res) {
       return res.status(400).json({ message: phoneError });
     }
 
+    let affiliateProvider = null;
+    if (pgId) {
+      affiliateProvider = await PaymentProvider.findById(pgId);
+      if (!affiliateProvider) {
+        return res.status(400).json({ message: "Invalid payment gateway affiliate link" });
+      }
+    }
+
+    const now = new Date();
     const lead = await MerchantLead.create({
       businessName: businessName.trim(),
       email: email.trim().toLowerCase(),
       phone: getPhoneDigits(phone),
       industry: null,
       priority: null,
-      source: "merchant",
+      source: affiliateProvider ? "pg-affiliate" : "merchant",
       userId: null,
       formStep: 1,
+      registeredViaPgId: affiliateProvider?._id ?? null,
+      assignedPgId: affiliateProvider?._id ?? null,
+      assignedPgName: affiliateProvider?.companyName ?? null,
+      assignedAt: affiliateProvider ? now : null,
     });
 
     await LeadActivity.create({
       leadId: lead._id,
       type: LEAD_ACTIVITY_TYPES.CREATED,
-      message: "Merchant lead submitted",
+      message: affiliateProvider
+        ? `Merchant lead registered via ${affiliateProvider.companyName} affiliate link`
+        : "Merchant lead submitted",
       actorName: businessName.trim(),
       actorRole: "merchant",
-      meta: { source: "merchant", formStep: 1 },
+      meta: {
+        source: affiliateProvider ? "pg-affiliate" : "merchant",
+        formStep: 1,
+        paymentProviderId: affiliateProvider?._id?.toString() ?? null,
+      },
     });
 
     const sanitized = MerchantLead.sanitize({

@@ -27,6 +27,37 @@ function normalizeAdminFileMeta(file) {
   };
 }
 
+const PG_SELF_PROFILE_ONBOARDING_FIELDS = [
+  "brandName",
+  "legalEntityName",
+  "companyLogo",
+  "companyOverview",
+  "websiteUrl",
+];
+
+const PG_SELF_CONFIG_FIELDS = [
+  "upiMdr",
+  "creditCardMdr",
+  "debitCardMdr",
+  "internationalMdr",
+  "walletCharges",
+  "netBankingCharges",
+  "emiBnplCharges",
+  "onboardingTat",
+  "settlementCycle",
+  "refundSla",
+  "features",
+  "suggestNewFeature",
+];
+
+function pickFields(source, allowedFields) {
+  return Object.fromEntries(
+    allowedFields
+      .filter((key) => source[key] !== undefined)
+      .map((key) => [key, source[key]]),
+  );
+}
+
 /** Public: PGs with Talk to Expert enabled + nominated expert (for website form). */
 export async function listTalkToExpertProviders(req, res) {
   try {
@@ -133,16 +164,57 @@ export async function updateMyPaymentProfile(req, res) {
       return res.status(404).json({ message: "Payment gateway profile not found" });
     }
 
-    if (provider.verificationStatus === PG_VERIFICATION_STATUSES.APPROVED) {
-      return res.status(400).json({
-        message: "Your onboarding profile is already approved and cannot be edited",
-      });
-    }
-
     const { section, submit, onboarding: onboardingBody, ...flatFields } = req.body;
     const updates = {};
 
-    if (section === "onboarding" || section === "draft" || section === "submit" || !section) {
+    if (section === "profile") {
+      const source =
+        onboardingBody && typeof onboardingBody === "object"
+          ? { ...flatFields, ...onboardingBody }
+          : flatFields;
+      const companyName = String(source.companyName || "").trim();
+      const contactPerson = String(source.contactPerson || "").trim();
+      const email = String(source.email || "").trim().toLowerCase();
+      const phone = String(source.phone || "").trim();
+
+      if (!companyName || !contactPerson || !email || !phone) {
+        return res.status(400).json({
+          message: "Company name, contact person, email, and phone are required",
+        });
+      }
+
+      const emailError = validateEmail(email);
+      if (emailError) return res.status(400).json({ message: emailError });
+      const phoneError = validateMobilePhone(phone);
+      if (phoneError) return res.status(400).json({ message: phoneError });
+
+      updates.companyName = companyName;
+      updates.contactPerson = contactPerson;
+      updates.designation = String(source.designation || "").trim();
+      updates.email = email;
+      updates.phone = getPhoneDigits(phone);
+      updates.website = String(source.website || source.websiteUrl || "").trim();
+      updates.onboarding = sanitizeOnboardingPayload(
+        pickFields(source, PG_SELF_PROFILE_ONBOARDING_FIELDS),
+        { mergeWith: provider.onboarding || {} },
+      );
+    } else if (section === "config") {
+      const source =
+        onboardingBody && typeof onboardingBody === "object"
+          ? onboardingBody
+          : flatFields;
+      updates.onboarding = sanitizeOnboardingPayload(
+        pickFields(source, PG_SELF_CONFIG_FIELDS),
+        { mergeWith: provider.onboarding || {} },
+      );
+    } else if (section === "onboarding" || section === "draft" || section === "submit" || !section) {
+      if (provider.verificationStatus === PG_VERIFICATION_STATUSES.APPROVED) {
+        return res.status(400).json({
+          message:
+            "Approved onboarding cannot be resubmitted. Use Profile or Configuration management instead.",
+        });
+      }
+
       const incoming =
         onboardingBody && typeof onboardingBody === "object" ? onboardingBody : flatFields;
 
@@ -179,7 +251,11 @@ export async function updateMyPaymentProfile(req, res) {
 
     return res.json({
       message:
-        updates.verificationStatus === PG_VERIFICATION_STATUSES.PENDING_REVIEW
+        section === "profile"
+          ? "Payment gateway profile updated successfully"
+          : section === "config"
+            ? "MDR, TAT, and supported features updated successfully"
+            : updates.verificationStatus === PG_VERIFICATION_STATUSES.PENDING_REVIEW
           ? "Onboarding submitted for review"
           : "Onboarding progress saved",
       paymentGateway: sanitized,
