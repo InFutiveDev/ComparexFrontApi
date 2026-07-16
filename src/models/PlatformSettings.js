@@ -1,4 +1,5 @@
 import { getDb } from "../mongo.js";
+import { defaultMdrSettings } from "../constants/mdrSettings.js";
 import {
   PLATFORM_SETTINGS_DOC_ID,
   defaultPlatformSettings,
@@ -12,6 +13,7 @@ function settings() {
 
 function mergeDefaults(doc = {}) {
   const defaults = defaultPlatformSettings();
+  const mdrDefaults = defaultMdrSettings();
   return {
     ...defaults,
     ...doc,
@@ -41,6 +43,14 @@ function mergeDefaults(doc = {}) {
         ? doc.payouts.eligibleStatuses
         : defaults.payouts.eligibleStatuses,
     },
+    mdr: {
+      ...mdrDefaults,
+      ...(doc.mdr || {}),
+      globalRates: Array.isArray(doc.mdr?.globalRates)
+        ? doc.mdr.globalRates
+        : mdrDefaults.globalRates,
+      tiers: Array.isArray(doc.mdr?.tiers) ? doc.mdr.tiers : mdrDefaults.tiers,
+    },
   };
 }
 
@@ -66,7 +76,7 @@ export const PlatformSettings = {
   },
 
   async updateSection(section, data, actor = null) {
-    const allowed = ["fees", "permissions", "payouts"];
+    const allowed = ["fees", "permissions", "payouts", "mdr"];
     if (!allowed.includes(section)) {
       return { invalid: true, updated: null };
     }
@@ -81,10 +91,19 @@ export const PlatformSettings = {
             allPermissionKeys: current.permissions.allPermissionKeys,
             roles: Array.isArray(data.roles) ? data.roles : current.permissions.roles,
           }
-        : {
-            ...current[section],
-            ...data,
-          };
+        : section === "mdr"
+          ? {
+              ...current.mdr,
+              ...data,
+              globalRates: Array.isArray(data.globalRates)
+                ? data.globalRates
+                : current.mdr.globalRates,
+              tiers: Array.isArray(data.tiers) ? data.tiers : current.mdr.tiers,
+            }
+          : {
+              ...current[section],
+              ...data,
+            };
 
     const updates = {
       [section]: nextSection,
@@ -115,6 +134,7 @@ export const PlatformSettings = {
       fees: merged.fees,
       permissions: merged.permissions,
       payouts: merged.payouts,
+      mdr: merged.mdr,
       updatedAt: doc?.updatedAt ?? null,
       updatedBy: doc?.updatedBy ?? null,
       createdAt: doc?.createdAt ?? null,

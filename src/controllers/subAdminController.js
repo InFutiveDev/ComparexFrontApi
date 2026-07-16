@@ -187,6 +187,23 @@ export async function listAssignablePgs(req, res) {
   }
 }
 
+/** FR-SA-07 / FR-SA-08 — PG experts with Calendly + available slots for routing */
+export async function listRoutableExperts(req, res) {
+  try {
+    const items = await PaymentProvider.findTalkToExpertProviders({
+      search: req.query.search,
+    });
+
+    return res.json({
+      experts: items.map(PaymentProvider.sanitizeTalkToExpert),
+      total: items.length,
+    });
+  } catch (error) {
+    console.error("List routable experts error:", error);
+    return res.status(500).json({ message: "Failed to fetch PG experts" });
+  }
+}
+
 /** FR-SA-04 + FR-SA-06 — assign qualified lead to PG and notify */
 export async function assignLeadToPg(req, res) {
   try {
@@ -266,7 +283,7 @@ export async function assignLeadToPg(req, res) {
   }
 }
 
-/** FR-SA-04 — book Talk to Expert from a lead */
+/** FR-SA-04 / FR-SA-07 — route lead to PG expert via Calendly (or manual preferred slot) */
 export async function bookTalkToExpert(req, res) {
   try {
     const leadId = req.params.id;
@@ -285,35 +302,67 @@ export async function bookTalkToExpert(req, res) {
       notes,
       calendlyEventUri,
       calendlyInviteeUri,
+      slotId,
+      slotDateLabel,
+      slotTime,
+      scheduledAt,
+      representativeName,
+      representativeTitle,
+      bookingSource,
     } = req.body;
 
-    let resolvedPgName = paymentGatewayName ?? null;
-    if (paymentGatewayId) {
-      const provider = await PaymentProvider.findById(paymentGatewayId);
-      if (!provider) {
-        return res.status(404).json({ message: "Payment gateway not found" });
-      }
-      resolvedPgName = provider.companyName;
+    if (!paymentGatewayId) {
+      return res.status(400).json({
+        message: "Select a PG expert (paymentGatewayId) before routing",
+      });
     }
+
+    const provider = await PaymentProvider.findById(paymentGatewayId);
+    if (!provider) {
+      return res.status(404).json({ message: "Payment gateway not found" });
+    }
+
+    const expert = PaymentProvider.sanitizeTalkToExpert(provider);
+    const resolvedPgName =
+      paymentGatewayName || expert.name || provider.companyName || null;
+
+    const hasCalendlyBooking = Boolean(calendlyEventUri || calendlyInviteeUri);
+    const hasManualSlot = Boolean(preferredDate || preferredTime || slotId);
+
+    if (!hasCalendlyBooking && !hasManualSlot) {
+      return res.status(400).json({
+        message:
+          "Confirm an available expert slot in Calendly (or provide preferred date/time) before routing",
+      });
+    }
+
+    const normalizedSource =
+      bookingSource === "calendly" || hasCalendlyBooking ? "calendly" : "sub-admin";
 
     const actor = actorFromReq(req);
     const booking = await ExpertBooking.create({
-      fullName: lead.businessName,
+      fullName: lead.fullName || lead.businessName,
       businessName: lead.businessName,
       email: lead.email,
       phone: lead.phone,
       industry: lead.industry ?? null,
       priority: lead.priority ?? null,
-      paymentGatewayId: paymentGatewayId ? parseObjectId(paymentGatewayId) : null,
+      paymentGatewayId: parseObjectId(paymentGatewayId) || paymentGatewayId,
       paymentGatewayName: resolvedPgName,
       merchantLeadId: lead._id,
+      representativeName: representativeName || expert.rep?.name || null,
+      representativeTitle: representativeTitle || expert.rep?.title || null,
       preferredDate: preferredDate ?? null,
       preferredTime: preferredTime ?? null,
-      timezone: timezone ?? null,
+      timezone: timezone ?? "Asia/Kolkata",
       notes: notes ?? lead.qualificationNotes ?? null,
+      slotId: slotId || calendlyEventUri || null,
+      slotDateLabel: slotDateLabel || preferredDate || null,
+      slotTime: slotTime || preferredTime || null,
+      scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
       calendlyEventUri: calendlyEventUri ?? null,
       calendlyInviteeUri: calendlyInviteeUri ?? null,
-      bookingSource: "sub-admin",
+      bookingSource: normalizedSource,
       status: "new",
       source: "talk-to-expert",
     });
@@ -321,26 +370,39 @@ export async function bookTalkToExpert(req, res) {
     const { updated } = await MerchantLead.updateById(leadId, {
       leadStatus: LEAD_STATUSES.EXPERT_BOOKED,
       expertBookingId: booking._id,
+      assignedPgId: provider._id,
+      assignedPgName: resolvedPgName,
+      assignedAt: new Date(),
+      assignedBy: parseObjectId(actor._id) || actor._id,
     });
 
     await recordActivity(
       leadId,
       LEAD_ACTIVITY_TYPES.EXPERT_BOOKED,
-      "Talk to Expert booked for this lead",
+      hasCalendlyBooking
+        ? `Lead routed to ${expert.rep?.name || "PG expert"} via Calendly`
+        : "Talk to Expert booked for this lead",
       actor,
       {
         expertBookingId: booking._id.toString(),
-        paymentGatewayId: paymentGatewayId ?? null,
+        paymentGatewayId,
         paymentGatewayName: resolvedPgName,
+        representativeName: expert.rep?.name || null,
+        slotDateLabel: slotDateLabel || preferredDate || null,
+        slotTime: slotTime || preferredTime || null,
+        calendlyEventUri: calendlyEventUri || null,
       },
     );
 
     const activities = await LeadActivity.findByLeadId(leadId);
 
     return res.status(201).json({
-      message: "Talk to Expert booked successfully",
+      message: hasCalendlyBooking
+        ? "Lead routed to PG expert via Calendly successfully"
+        : "Talk to Expert booked successfully",
       lead: MerchantLead.sanitize(updated),
       booking: ExpertBooking.sanitize(booking),
+      expert,
       timeline: activities.map(LeadActivity.sanitize),
     });
   } catch (error) {

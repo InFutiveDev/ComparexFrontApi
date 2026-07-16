@@ -1,4 +1,5 @@
 import { USER_ROLES } from "./userRoles.js";
+import { defaultMdrSettings } from "./mdrSettings.js";
 
 export const PLATFORM_SETTINGS_DOC_ID = "global";
 
@@ -158,5 +159,6 @@ export function defaultPlatformSettings() {
     fees: defaultFeeSettings(),
     permissions: defaultPermissionSettings(),
     payouts: defaultPayoutSettings(),
+    mdr: defaultMdrSettings(),
   };
 }

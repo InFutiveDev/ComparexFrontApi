@@ -9,6 +9,47 @@ import {
 
 const COLLECTION = "payment_providers";
 
+/** Turn free-text PG availability into selectable slot labels for FR-SA-08. */
+function parseAvailabilitySlotLabels(raw) {
+  const text = String(raw || "").trim();
+  if (!text) return [];
+
+  const parts = text
+    .split(/[\n;,|]+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (parts.length > 1) {
+    return parts.slice(0, 16).map((label, index) => ({
+      id: `slot_${index + 1}`,
+      label,
+    }));
+  }
+
+  // Single summary like "Mon–Fri 10:00–18:00 IST" → expand sample days/times for display
+  const sampleTimes = ["10:00 AM", "11:30 AM", "2:00 PM", "4:30 PM"];
+  const slots = [];
+  for (let dayOffset = 1; dayOffset <= 5; dayOffset += 1) {
+    const date = new Date();
+    date.setDate(date.getDate() + dayOffset);
+    if (date.getDay() === 0 || date.getDay() === 6) continue;
+    const dateLabel = date.toLocaleDateString("en-IN", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+    });
+    for (const time of sampleTimes) {
+      slots.push({
+        id: `${dayOffset}-${time}`,
+        label: `${dateLabel} · ${time}`,
+        dateLabel,
+        time,
+      });
+    }
+  }
+  return slots.slice(0, 12);
+}
+
 function providers() {
   return getDb().collection(COLLECTION);
 }
@@ -138,6 +179,68 @@ export const PaymentProvider = {
     }
 
     return providers().findOne({ userId: objectId });
+  },
+
+  /** Public Talk to Expert listing — PGs that nominated an expert. */
+  async findTalkToExpertProviders({ search } = {}) {
+    const filter = {
+      "onboarding.talkToExpertEnabled": true,
+      "onboarding.expertName": { $exists: true, $nin: [null, ""] },
+      accountStatus: { $ne: "inactive" },
+    };
+
+    if (search?.trim()) {
+      const q = search.trim();
+      filter.$and = [
+        {
+          $or: [
+            { companyName: { $regex: q, $options: "i" } },
+            { "onboarding.brandName": { $regex: q, $options: "i" } },
+            { "onboarding.expertName": { $regex: q, $options: "i" } },
+          ],
+        },
+      ];
+    }
+
+    return providers()
+      .find(filter)
+      .sort({ companyName: 1 })
+      .limit(100)
+      .toArray();
+  },
+
+  sanitizeTalkToExpert(provider) {
+    const onboarding = sanitizeOnboardingPayload(provider.onboarding || emptyPgOnboarding());
+    const name =
+      (onboarding.brandName || "").trim() ||
+      (provider.companyName || "").trim() ||
+      "Payment Gateway";
+    const expertName = (onboarding.expertName || "").trim();
+    const logoUrl = onboarding.companyLogo?.url || null;
+    const availabilityRaw = (onboarding.availabilitySlots || "").trim();
+    const calendlyUrl = (onboarding.calendlyUrl || "").trim() || null;
+
+    return {
+      id: provider._id.toString(),
+      name,
+      companyName: provider.companyName || name,
+      logo: logoUrl,
+      initials: name.slice(0, 2).toUpperCase(),
+      calendlyUrl,
+      calendarSynced: Boolean(onboarding.calendarSynced),
+      availabilitySlots: availabilityRaw || null,
+      availableSlots: parseAvailabilitySlotLabels(availabilityRaw),
+      rep: {
+        name: expertName,
+        title: (onboarding.expertDesignation || "").trim() || "PG Representative",
+        experience: "Nominated partner expert",
+        bio:
+          (onboarding.expertDescription || "").trim() ||
+          `Connect with ${expertName} from ${name} for onboarding guidance and commercial discussions.`,
+        email: (onboarding.expertEmail || "").trim() || null,
+        phone: (onboarding.expertMobile || "").trim() || null,
+      },
+    };
   },
 
   async updateById(id, data) {

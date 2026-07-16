@@ -86,6 +86,7 @@ export const PG_ONBOARDING_KEYS = [
   "expertEmail",
   "expertMobile",
   "expertDescription",
+  "calendlyUrl",
   "calendarSynced",
   "availabilitySlots",
 ];

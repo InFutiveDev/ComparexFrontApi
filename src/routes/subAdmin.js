@@ -9,6 +9,7 @@ import {
   listAssignablePgs,
   listLeads,
   listPgNotifications,
+  listRoutableExperts,
   updateLeadStatus,
 } from "../controllers/subAdminController.js";
 import { authMiddleware, requireSubAdmin } from "../middleware/auth.js";
@@ -29,6 +30,7 @@ router.patch("/leads/:id/status", updateLeadStatus);
 router.post("/leads/:id/assign", assignLeadToPg);
 router.post("/leads/:id/talk-to-expert", bookTalkToExpert);
 router.get("/payment-gateways", listAssignablePgs);
+router.get("/experts", listRoutableExperts);
 router.get("/notifications", listPgNotifications);
 
 export { router as subAdminRouter };

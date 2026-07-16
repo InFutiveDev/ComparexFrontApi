@@ -27,6 +27,23 @@ function normalizeAdminFileMeta(file) {
   };
 }
 
+/** Public: PGs with Talk to Expert enabled + nominated expert (for website form). */
+export async function listTalkToExpertProviders(req, res) {
+  try {
+    const items = await PaymentProvider.findTalkToExpertProviders({
+      search: req.query.search,
+    });
+
+    return res.json({
+      paymentGateways: items.map(PaymentProvider.sanitizeTalkToExpert),
+      total: items.length,
+    });
+  } catch (error) {
+    console.error("List talk-to-expert providers error:", error);
+    return res.status(500).json({ message: "Failed to fetch payment gateway experts" });
+  }
+}
+
 export function getFormOptions(_req, res) {
   return res.json({
     title: "Let's Get Acquainted",

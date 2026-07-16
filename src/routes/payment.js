@@ -6,6 +6,7 @@ import {
   getFormOptions,
   getMyPaymentProfile,
   getPaymentGatewayById,
+  listTalkToExpertProviders,
   submitPaymentForm,
   updateMyPaymentProfile,
   updatePaymentAccountStatus,
@@ -18,6 +19,7 @@ import { authMiddleware, requireAdmin } from "../middleware/auth.js";
 const router = Router();
 
 router.get("/form-options", getFormOptions);
+router.get("/talk-to-expert", listTalkToExpertProviders);
 router.get("/me", authMiddleware, getMyPaymentProfile);
 router.patch("/me", authMiddleware, updateMyPaymentProfile);
 router.post("/admin", authMiddleware, requireAdmin, adminOnboardPaymentGateway);
