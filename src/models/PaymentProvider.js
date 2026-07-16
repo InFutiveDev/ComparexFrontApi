@@ -6,6 +6,7 @@ import {
   resolvePgVerificationStatus,
   sanitizeOnboardingPayload,
 } from "../utils/pgOnboarding.js";
+import { getSignedDownloadUrl } from "../services/s3Service.js";
 
 const COLLECTION = "payment_providers";
 
@@ -209,14 +210,21 @@ export const PaymentProvider = {
       .toArray();
   },
 
-  sanitizeTalkToExpert(provider) {
+  async sanitizeTalkToExpert(provider) {
     const onboarding = sanitizeOnboardingPayload(provider.onboarding || emptyPgOnboarding());
     const name =
       (onboarding.brandName || "").trim() ||
       (provider.companyName || "").trim() ||
       "Payment Gateway";
     const expertName = (onboarding.expertName || "").trim();
-    const logoUrl = onboarding.companyLogo?.url || null;
+    let logoUrl = onboarding.companyLogo?.url || null;
+    if (onboarding.companyLogo?.key) {
+      try {
+        logoUrl = await getSignedDownloadUrl(onboarding.companyLogo.key);
+      } catch (error) {
+        console.error("Failed to refresh PG expert logo URL:", error.message);
+      }
+    }
     const availabilityRaw = (onboarding.availabilitySlots || "").trim();
     const calendlyUrl = (onboarding.calendlyUrl || "").trim() || null;
 

@@ -65,8 +65,12 @@ export async function listTalkToExpertProviders(req, res) {
       search: req.query.search,
     });
 
+    const paymentGateways = await Promise.all(
+      items.map((item) => PaymentProvider.sanitizeTalkToExpert(item)),
+    );
+
     return res.json({
-      paymentGateways: items.map(PaymentProvider.sanitizeTalkToExpert),
+      paymentGateways,
       total: items.length,
     });
   } catch (error) {

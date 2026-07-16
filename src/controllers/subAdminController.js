@@ -194,8 +194,12 @@ export async function listRoutableExperts(req, res) {
       search: req.query.search,
     });
 
+    const experts = await Promise.all(
+      items.map((item) => PaymentProvider.sanitizeTalkToExpert(item)),
+    );
+
     return res.json({
-      experts: items.map(PaymentProvider.sanitizeTalkToExpert),
+      experts,
       total: items.length,
     });
   } catch (error) {
@@ -322,7 +326,7 @@ export async function bookTalkToExpert(req, res) {
       return res.status(404).json({ message: "Payment gateway not found" });
     }
 
-    const expert = PaymentProvider.sanitizeTalkToExpert(provider);
+    const expert = await PaymentProvider.sanitizeTalkToExpert(provider);
     const resolvedPgName =
       paymentGatewayName || expert.name || provider.companyName || null;
 
