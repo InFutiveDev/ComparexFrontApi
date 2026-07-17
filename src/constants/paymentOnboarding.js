@@ -89,4 +89,5 @@ export const PG_ONBOARDING_KEYS = [
   "calendlyUrl",
   "calendarSynced",
   "availabilitySlots",
+  "experts",
 ];

@@ -7,6 +7,7 @@ import {
   sanitizeOnboardingPayload,
 } from "../utils/pgOnboarding.js";
 import { getSignedDownloadUrl } from "../services/s3Service.js";
+import { getPrimaryPgExpert, resolvePgExperts } from "../utils/pgExperts.js";
 
 const COLLECTION = "payment_providers";
 
@@ -186,8 +187,18 @@ export const PaymentProvider = {
   async findTalkToExpertProviders({ search } = {}) {
     const filter = {
       "onboarding.talkToExpertEnabled": true,
-      "onboarding.expertName": { $exists: true, $nin: [null, ""] },
       accountStatus: { $ne: "inactive" },
+      $or: [
+        { "onboarding.expertName": { $exists: true, $nin: [null, ""] } },
+        {
+          "onboarding.experts": {
+            $elemMatch: {
+              name: { $exists: true, $nin: [null, ""] },
+              status: { $ne: "inactive" },
+            },
+          },
+        },
+      ],
     };
 
     if (search?.trim()) {
@@ -198,6 +209,7 @@ export const PaymentProvider = {
             { companyName: { $regex: q, $options: "i" } },
             { "onboarding.brandName": { $regex: q, $options: "i" } },
             { "onboarding.expertName": { $regex: q, $options: "i" } },
+            { "onboarding.experts.name": { $regex: q, $options: "i" } },
           ],
         },
       ];
@@ -210,13 +222,14 @@ export const PaymentProvider = {
       .toArray();
   },
 
-  async sanitizeTalkToExpert(provider) {
+  async sanitizeTalkToExpert(provider, selectedExpert = null) {
     const onboarding = sanitizeOnboardingPayload(provider.onboarding || emptyPgOnboarding());
     const name =
       (onboarding.brandName || "").trim() ||
       (provider.companyName || "").trim() ||
       "Payment Gateway";
-    const expertName = (onboarding.expertName || "").trim();
+    const expert = selectedExpert || getPrimaryPgExpert(provider);
+    const expertName = (expert?.name || onboarding.expertName || "").trim();
     let logoUrl = onboarding.companyLogo?.url || null;
     if (onboarding.companyLogo?.key) {
       try {
@@ -225,29 +238,51 @@ export const PaymentProvider = {
         console.error("Failed to refresh PG expert logo URL:", error.message);
       }
     }
-    const availabilityRaw = (onboarding.availabilitySlots || "").trim();
-    const calendlyUrl = (onboarding.calendlyUrl || "").trim() || null;
+    const availabilityRaw = (
+      expert?.availabilitySlots ||
+      onboarding.availabilitySlots ||
+      ""
+    ).trim();
+    const calendlyUrl = (
+      expert?.calendlyUrl ||
+      onboarding.calendlyUrl ||
+      ""
+    ).trim() || null;
+    const experts = resolvePgExperts(provider)
+      .filter((item) => item.status !== "inactive")
+      .map((item) => ({
+        ...item,
+        availableSlots: parseAvailabilitySlotLabels(item.availabilitySlots),
+      }));
 
     return {
       id: provider._id.toString(),
+      paymentGatewayId: provider._id.toString(),
+      expertId: expert?.id || null,
+      routingId: expert?.id
+        ? `${provider._id.toString()}:${expert.id}`
+        : provider._id.toString(),
       name,
       companyName: provider.companyName || name,
       logo: logoUrl,
       initials: name.slice(0, 2).toUpperCase(),
       calendlyUrl,
-      calendarSynced: Boolean(onboarding.calendarSynced),
+      calendarSynced: Boolean(expert?.calendarSynced || onboarding.calendarSynced),
       availabilitySlots: availabilityRaw || null,
       availableSlots: parseAvailabilitySlotLabels(availabilityRaw),
       rep: {
         name: expertName,
-        title: (onboarding.expertDesignation || "").trim() || "PG Representative",
+        title:
+          (expert?.designation || onboarding.expertDesignation || "").trim() ||
+          "PG Representative",
         experience: "Nominated partner expert",
         bio:
-          (onboarding.expertDescription || "").trim() ||
+          (expert?.description || onboarding.expertDescription || "").trim() ||
           `Connect with ${expertName} from ${name} for onboarding guidance and commercial discussions.`,
-        email: (onboarding.expertEmail || "").trim() || null,
-        phone: (onboarding.expertMobile || "").trim() || null,
+        email: (expert?.email || onboarding.expertEmail || "").trim() || null,
+        phone: (expert?.mobile || onboarding.expertMobile || "").trim() || null,
       },
+      experts,
     };
   },
 

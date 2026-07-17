@@ -13,6 +13,7 @@ import { PaymentProvider } from "../models/PaymentProvider.js";
 import { notifyPgLeadAssignment } from "../services/notifyPg.js";
 import { parseCsv } from "../utils/csv.js";
 import { parseObjectId } from "../utils/objectId.js";
+import { resolvePgExperts } from "../utils/pgExperts.js";
 
 function actorFromReq(req) {
   return req.user ?? {
@@ -195,7 +196,14 @@ export async function listRoutableExperts(req, res) {
     });
 
     const experts = await Promise.all(
-      items.map((item) => PaymentProvider.sanitizeTalkToExpert(item)),
+      items.flatMap((provider) => {
+        const activeExperts = resolvePgExperts(provider).filter(
+          (expert) => expert.status === "active",
+        );
+        return activeExperts.map((expert) =>
+          PaymentProvider.sanitizeTalkToExpert(provider, expert),
+        );
+      }),
     );
 
     return res.json({
@@ -313,6 +321,7 @@ export async function bookTalkToExpert(req, res) {
       representativeName,
       representativeTitle,
       bookingSource,
+      expertId,
     } = req.body;
 
     if (!paymentGatewayId) {
@@ -326,7 +335,12 @@ export async function bookTalkToExpert(req, res) {
       return res.status(404).json({ message: "Payment gateway not found" });
     }
 
-    const expert = await PaymentProvider.sanitizeTalkToExpert(provider);
+    const selectedExpert =
+      resolvePgExperts(provider).find((item) => item.id === expertId) || null;
+    const expert = await PaymentProvider.sanitizeTalkToExpert(
+      provider,
+      selectedExpert,
+    );
     const resolvedPgName =
       paymentGatewayName || expert.name || provider.companyName || null;
 
@@ -353,6 +367,7 @@ export async function bookTalkToExpert(req, res) {
       priority: lead.priority ?? null,
       paymentGatewayId: parseObjectId(paymentGatewayId) || paymentGatewayId,
       paymentGatewayName: resolvedPgName,
+      expertId: expert.expertId,
       merchantLeadId: lead._id,
       representativeName: representativeName || expert.rep?.name || null,
       representativeTitle: representativeTitle || expert.rep?.title || null,

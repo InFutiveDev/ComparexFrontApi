@@ -38,6 +38,47 @@ export const Review = {
     return { items, total, page: safePage, limit: safeLimit };
   },
 
+  async getPublishedRatingSummaries() {
+    return reviews()
+      .aggregate([
+        {
+          $match: {
+            status: "published",
+            rating: { $gte: 1, $lte: 5 },
+          },
+        },
+        {
+          $group: {
+            _id: {
+              productId: {
+                $toLower: {
+                  $convert: {
+                    input: "$productId",
+                    to: "string",
+                    onError: "",
+                    onNull: "",
+                  },
+                },
+              },
+              productName: {
+                $toLower: {
+                  $convert: {
+                    input: "$productName",
+                    to: "string",
+                    onError: "",
+                    onNull: "",
+                  },
+                },
+              },
+            },
+            average: { $avg: "$rating" },
+            count: { $sum: 1 },
+          },
+        },
+      ])
+      .toArray();
+  },
+
   findById(id) {
     const objectId = parseObjectId(id);
     if (!objectId) return null;

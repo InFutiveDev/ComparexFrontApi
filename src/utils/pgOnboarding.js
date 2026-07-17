@@ -68,6 +68,7 @@ export function emptyPgOnboarding() {
         return [key, false];
       }
       if (key === "talkToExpertEnabled") return [key, true];
+      if (key === "experts") return [key, []];
       if (key === "companyLogo" || key === "onboardingChecklist") return [key, null];
       return [key, ""];
     }),
@@ -83,6 +84,13 @@ export function sanitizeOnboardingPayload(input = {}, { mergeWith = null } = {})
 
     if (key === "companyLogo" || key === "onboardingChecklist") {
       next[key] = normalizeFileMeta(input[key]);
+      continue;
+    }
+
+    if (key === "experts") {
+      next[key] = Array.isArray(input[key])
+        ? input[key].filter((item) => item && typeof item === "object")
+        : [];
       continue;
     }
 

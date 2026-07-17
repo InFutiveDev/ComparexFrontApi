@@ -14,6 +14,11 @@ import {
   sanitizeOnboardingPayload,
 } from "../utils/pgOnboarding.js";
 import { getPhoneDigits, validateEmail, validateMobilePhone } from "../utils/validation.js";
+import {
+  getPrimaryPgExpert,
+  normalizePgExperts,
+  resolvePgExperts,
+} from "../utils/pgExperts.js";
 
 function normalizeAdminFileMeta(file) {
   if (!file || typeof file !== "object") return null;
@@ -157,6 +162,110 @@ export async function getMyPaymentProfile(req, res) {
   } catch (error) {
     console.error("Get my payment profile error:", error);
     return res.status(500).json({ message: "Failed to fetch payment gateway profile" });
+  }
+}
+
+/** FR-PG-06 / FR-PG-07 — PG-managed internal advisors and Calendly availability. */
+export async function getMyPgExperts(req, res) {
+  try {
+    const provider = await PaymentProvider.findByUserId(req.userId);
+    if (!provider) {
+      return res.status(404).json({ message: "Payment gateway profile not found" });
+    }
+
+    return res.json({
+      experts: resolvePgExperts(provider),
+      total: resolvePgExperts(provider).length,
+    });
+  } catch (error) {
+    console.error("Get my PG experts error:", error);
+    return res.status(500).json({ message: "Failed to fetch PG experts" });
+  }
+}
+
+export async function updateMyPgExperts(req, res) {
+  try {
+    const provider = await PaymentProvider.findByUserId(req.userId);
+    if (!provider) {
+      return res.status(404).json({ message: "Payment gateway profile not found" });
+    }
+
+    if (!Array.isArray(req.body.experts)) {
+      return res.status(400).json({ message: "experts must be an array" });
+    }
+    if (req.body.experts.length > 20) {
+      return res.status(400).json({ message: "A maximum of 20 experts is supported" });
+    }
+
+    const experts = normalizePgExperts(req.body.experts).map((expert) => ({
+      ...expert,
+      mobile: getPhoneDigits(expert.mobile),
+    }));
+
+    for (let index = 0; index < experts.length; index += 1) {
+      const expert = experts[index];
+      const label = `Expert ${index + 1}`;
+      if (!expert.name || !expert.email || !expert.mobile) {
+        return res.status(400).json({
+          message: `${label}: name, email, and mobile are required`,
+        });
+      }
+      const emailError = validateEmail(expert.email);
+      if (emailError) {
+        return res.status(400).json({ message: `${label}: ${emailError}` });
+      }
+      const mobileError = validateMobilePhone(expert.mobile);
+      if (mobileError) {
+        return res.status(400).json({ message: `${label}: ${mobileError}` });
+      }
+      if (expert.calendlyUrl) {
+        try {
+          const url = new URL(expert.calendlyUrl);
+          if (url.protocol !== "https:" || !url.hostname.endsWith("calendly.com")) {
+            throw new Error("invalid Calendly URL");
+          }
+        } catch {
+          return res.status(400).json({
+            message: `${label}: enter a valid https://calendly.com scheduling URL`,
+          });
+        }
+      }
+    }
+
+    const primary = experts.find(
+      (expert) => expert.isPrimary && expert.status === "active",
+    );
+    const nextOnboarding = sanitizeOnboardingPayload(
+      {
+        ...(provider.onboarding || {}),
+        experts,
+        talkToExpertEnabled: Boolean(primary),
+        expertName: primary?.name || "",
+        expertDesignation: primary?.designation || "",
+        expertEmail: primary?.email || "",
+        expertMobile: primary?.mobile || "",
+        expertDescription: primary?.description || "",
+        calendlyUrl: primary?.calendlyUrl || "",
+        calendarSynced: Boolean(primary?.calendlyUrl || primary?.calendarSynced),
+        availabilitySlots: primary?.availabilitySlots || "",
+      },
+      { mergeWith: provider.onboarding || {} },
+    );
+    const result = await PaymentProvider.updateById(provider._id, {
+      onboarding: nextOnboarding,
+    });
+    if (!result.updated) {
+      return res.status(404).json({ message: "Payment gateway profile not found" });
+    }
+
+    return res.json({
+      message: "Internal experts and Calendly availability updated successfully",
+      experts: resolvePgExperts(result.updated),
+      primaryExpert: getPrimaryPgExpert(result.updated),
+    });
+  } catch (error) {
+    console.error("Update my PG experts error:", error);
+    return res.status(500).json({ message: "Failed to update PG experts" });
   }
 }
 
