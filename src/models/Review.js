@@ -47,9 +47,20 @@ export const Review = {
             rating: { $gte: 1, $lte: 5 },
           },
         },
+        { $sort: { createdAt: -1 } },
         {
           $group: {
             _id: {
+              paymentProviderId: {
+                $toLower: {
+                  $convert: {
+                    input: "$paymentProviderId",
+                    to: "string",
+                    onError: "",
+                    onNull: "",
+                  },
+                },
+              },
               productId: {
                 $toLower: {
                   $convert: {
@@ -73,6 +84,22 @@ export const Review = {
             },
             average: { $avg: "$rating" },
             count: { $sum: 1 },
+            reviews: {
+              $push: {
+                id: { $toString: "$_id" },
+                title: "$title",
+                reviewText: "$reviewText",
+                reviewerName: "$name",
+                createdAt: "$createdAt",
+              },
+            },
+          },
+        },
+        {
+          $project: {
+            average: 1,
+            count: 1,
+            reviews: { $slice: ["$reviews", 3] },
           },
         },
       ])
@@ -118,6 +145,8 @@ export const Review = {
     return {
       id: review._id.toString(),
       productId: review.productId,
+      paymentProviderId:
+        review.paymentProviderId?.toString?.() ?? review.paymentProviderId ?? null,
       productName: review.productName,
       productCompany: review.productCompany || "",
       productCategory: review.productCategory || "",
@@ -131,6 +160,10 @@ export const Review = {
       website: review.website || "",
       usageDuration: review.usageDuration || null,
       rating: review.rating ?? 0,
+      platformRating: review.platformRating ?? null,
+      reviewType: review.reviewType ?? "pg_review",
+      merchantUserId:
+        review.merchantUserId?.toString?.() ?? review.merchantUserId ?? null,
       recommendNps: review.recommendNps ?? null,
       ratings: review.ratings ?? {},
       title: review.title,

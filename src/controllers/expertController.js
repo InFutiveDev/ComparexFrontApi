@@ -4,6 +4,8 @@ import {
   EXPERT_PRIORITY_VALUES,
 } from "../constants/expertForm.js";
 import { ExpertBooking } from "../models/ExpertBooking.js";
+import { PaymentProvider } from "../models/PaymentProvider.js";
+import { resolvePgExperts } from "../utils/pgExperts.js";
 import { getPhoneDigits, validateEmail, validateMobilePhone } from "../utils/validation.js";
 
 export async function getAllExpertBookings(req, res) {
@@ -52,6 +54,7 @@ export async function submitExpertBooking(req, res) {
       priority,
       paymentGatewayId,
       paymentGatewayName,
+      expertId,
       representativeName,
       representativeTitle,
       slotId,
@@ -104,6 +107,19 @@ export async function submitExpertBooking(req, res) {
       return res.status(400).json({ message: "Invalid priority value" });
     }
 
+    const provider = await PaymentProvider.findById(paymentGatewayId);
+    if (!provider) {
+      return res.status(400).json({ message: "Selected payment gateway is unavailable" });
+    }
+    const selectedExpert = expertId
+      ? resolvePgExperts(provider).find(
+          (expert) => expert.id === expertId && expert.status === "active",
+        )
+      : null;
+    if (expertId && !selectedExpert) {
+      return res.status(400).json({ message: "Selected expert is unavailable" });
+    }
+
     const booking = await ExpertBooking.create({
       fullName: fullName.trim(),
       businessName: businessName.trim(),
@@ -113,9 +129,16 @@ export async function submitExpertBooking(req, res) {
       industry,
       priority,
       paymentGatewayId: paymentGatewayId.trim(),
-      paymentGatewayName: paymentGatewayName?.trim() || paymentGatewayId.trim(),
-      representativeName: representativeName?.trim() || null,
-      representativeTitle: representativeTitle?.trim() || null,
+      paymentGatewayName:
+        provider.onboarding?.brandName ||
+        provider.companyName ||
+        paymentGatewayName?.trim() ||
+        paymentGatewayId.trim(),
+      expertId: expertId?.trim() || null,
+      representativeName:
+        selectedExpert?.name || representativeName?.trim() || null,
+      representativeTitle:
+        selectedExpert?.designation || representativeTitle?.trim() || null,
       slotId: slotId.trim(),
       slotDateLabel: slotDateLabel?.trim() || null,
       slotTime: slotTime?.trim() || null,

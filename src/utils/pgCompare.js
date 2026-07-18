@@ -64,9 +64,12 @@ export function buildRatingMap(summaries = []) {
     const rating = {
       average: Number(Number(item.average || 0).toFixed(1)),
       count: Number(item.count || 0),
+      reviews: Array.isArray(item.reviews) ? item.reviews : [],
     };
+    const paymentProviderId = item._id?.paymentProviderId;
     const productId = item._id?.productId;
     const productName = item._id?.productName;
+    if (paymentProviderId) map.set(paymentProviderId, rating);
     if (productId) map.set(productId, rating);
     if (productName) map.set(productName, rating);
   }
@@ -85,7 +88,7 @@ export function sanitizePgCompareRow(provider, { logoUrl, mdrSettings, ratingMap
     ratingMap.get(provider._id.toString().toLowerCase()) ||
     ratingMap.get(slug) ||
     ratingMap.get(name.toLowerCase()) ||
-    { average: 0, count: 0 };
+    { average: 0, count: 0, reviews: [] };
   const categories = [
     ...(Array.isArray(onboarding.bestSuitedBusinessTypes)
       ? onboarding.bestSuitedBusinessTypes

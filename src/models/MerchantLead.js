@@ -221,9 +221,12 @@ export const MerchantLead = {
     return {
       id: lead._id.toString(),
       businessName: lead.businessName,
+      contactName: lead.contactName ?? null,
       email: lead.email,
       phone: lead.phone,
       industry: lead.industry ?? null,
+      merchantCategory: lead.merchantCategory ?? lead.industry ?? null,
+      estimatedMonthlyVolume: lead.estimatedMonthlyVolume ?? null,
       priority: lead.priority ?? null,
       location: lead.location ?? null,
       leadStatus: lead.leadStatus ?? LEAD_STATUSES.NEW,

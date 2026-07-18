@@ -53,6 +53,7 @@ export function requireRoles(...allowedRoles) {
 export const requireSubAdmin = requireRoles(USER_ROLES.SUB_ADMIN, USER_ROLES.ADMIN);
 export const requireAdmin = requireRoles(USER_ROLES.ADMIN);
 export const requirePaymentProvider = requireRoles(USER_ROLES.PAYMENT_PROVIDER);
+export const requireMerchant = requireRoles(USER_ROLES.MERCHANT);
 
 export function requireStaff(req, res, next) {
   return requireRoles(USER_ROLES.SUB_ADMIN, USER_ROLES.ADMIN)(req, res, next);

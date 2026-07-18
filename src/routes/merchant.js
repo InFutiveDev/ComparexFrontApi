@@ -5,14 +5,21 @@ import {
   getFormOptions,
   getMerchantGatewayById,
   submitMerchantForm,
+  submitMerchantPanelLead,
   updateMerchantAccountStatus,
   updateMerchantForm,
 } from "../controllers/merchantController.js";
-import { authMiddleware } from "../middleware/auth.js";
+import { authMiddleware, requireMerchant } from "../middleware/auth.js";
 
 const router = Router();
 
 router.get("/form-options", getFormOptions);
+router.post(
+  "/lead-submission",
+  authMiddleware,
+  requireMerchant,
+  submitMerchantPanelLead,
+);
 router.get("/", authMiddleware, getAllMerchantGateways);
 router.get("/:id", authMiddleware, getMerchantGatewayById);
 router.post("/", submitMerchantForm);

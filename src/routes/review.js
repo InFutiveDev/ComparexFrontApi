@@ -4,16 +4,22 @@ import {
   getAllReviews,
   getReviewById,
   submitReview,
+  submitMerchantReview,
   updateReviewStatus,
 } from "../controllers/reviewController.js";
-import { authMiddleware } from "../middleware/auth.js";
+import {
+  authMiddleware,
+  requireAdmin,
+  requireMerchant,
+} from "../middleware/auth.js";
 
 const router = Router();
 
 router.post("/", submitReview);
-router.get("/", authMiddleware, getAllReviews);
-router.get("/:id", authMiddleware, getReviewById);
-router.patch("/:id/status", authMiddleware, updateReviewStatus);
-router.delete("/:id", authMiddleware, deleteReview);
+router.post("/merchant", authMiddleware, requireMerchant, submitMerchantReview);
+router.get("/", authMiddleware, requireAdmin, getAllReviews);
+router.get("/:id", authMiddleware, requireAdmin, getReviewById);
+router.patch("/:id/status", authMiddleware, requireAdmin, updateReviewStatus);
+router.delete("/:id", authMiddleware, requireAdmin, deleteReview);
 
 export { router as reviewRouter };

@@ -1,5 +1,6 @@
 import { REVIEW_IDENTITY_METHODS, REVIEW_STATUSES } from "../constants/reviewForm.js";
 import { Review } from "../models/Review.js";
+import { PaymentProvider } from "../models/PaymentProvider.js";
 import { validateEmail } from "../utils/validation.js";
 
 function toNumberOrZero(value) {
@@ -189,6 +190,93 @@ export async function submitReview(req, res) {
   } catch (error) {
     console.error("Submit review error:", error);
     return res.status(500).json({ message: "Failed to submit review" });
+  }
+}
+
+/** FR-MC-09 / FR-MC-11 — authenticated PG and platform ratings from Merchant Panel. */
+export async function submitMerchantReview(req, res) {
+  try {
+    const {
+      paymentProviderId,
+      rating,
+      platformRating,
+      title,
+      reviewText,
+      businessName,
+    } = req.body;
+
+    if (
+      !paymentProviderId?.trim() ||
+      !title?.trim() ||
+      !reviewText?.trim()
+    ) {
+      return res.status(400).json({
+        message: "Payment gateway, review title, and review text are required",
+      });
+    }
+
+    const pgRating = Number(rating);
+    const overallPlatformRating = Number(platformRating);
+    if (!Number.isInteger(pgRating) || pgRating < 1 || pgRating > 5) {
+      return res.status(400).json({ message: "PG rating must be between 1 and 5" });
+    }
+    if (
+      !Number.isInteger(overallPlatformRating) ||
+      overallPlatformRating < 1 ||
+      overallPlatformRating > 5
+    ) {
+      return res.status(400).json({
+        message: "Platform experience rating must be between 1 and 5",
+      });
+    }
+    if (reviewText.trim().length < 10) {
+      return res.status(400).json({
+        message: "Review text must contain at least 10 characters",
+      });
+    }
+
+    const provider = await PaymentProvider.findById(paymentProviderId);
+    if (!provider) {
+      return res.status(400).json({ message: "Selected payment gateway is unavailable" });
+    }
+    const productName =
+      provider.onboarding?.brandName || provider.companyName || "Payment Gateway";
+
+    const review = await Review.create({
+      paymentProviderId: provider._id,
+      productId: provider._id.toString(),
+      productName,
+      productCompany: provider.companyName || productName,
+      productCategory: "payment-gateway",
+      identityMethod: "account",
+      name: req.user.name || "Merchant",
+      businessName: String(businessName || req.user.name || "").trim(),
+      email: req.user.email,
+      rating: pgRating,
+      platformRating: overallPlatformRating,
+      title: title.trim(),
+      reviewText: reviewText.trim(),
+      merchantUserId: req.user._id,
+      reviewType: "pg_and_platform_review",
+      status: "pending",
+      source: "merchant-panel",
+      ratings: {},
+      consents: {
+        genuine: true,
+        guidelines: true,
+        moderation: true,
+      },
+    });
+
+    return res.status(201).json({
+      id: review._id.toString(),
+      message:
+        "Thank you! Your ratings and review were submitted for moderation.",
+      review: Review.sanitize(review),
+    });
+  } catch (error) {
+    console.error("Submit merchant review error:", error);
+    return res.status(500).json({ message: "Failed to submit merchant review" });
   }
 }
 

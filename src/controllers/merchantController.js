@@ -4,6 +4,7 @@ import {
   MERCHANT_PRIORITIES,
   MERCHANT_PRIORITY_VALUES,
 } from "../constants/merchantForm.js";
+import { USER_ROLES } from "../constants/userRoles.js";
 import { MerchantLead } from "../models/MerchantLead.js";
 import { PaymentProvider } from "../models/PaymentProvider.js";
 import { LeadActivity } from "../models/LeadActivity.js";
@@ -34,6 +35,87 @@ export function getFormOptions(_req, res) {
     industries: MERCHANT_INDUSTRIES,
     priorities: MERCHANT_PRIORITIES,
   });
+}
+
+/** FR-MC-04 — authenticated merchant lead submission from the Merchant Panel. */
+export async function submitMerchantPanelLead(req, res) {
+  try {
+    const {
+      businessName,
+      contactName,
+      email,
+      phone,
+      merchantCategory,
+      estimatedMonthlyVolume,
+    } = req.body;
+
+    if (
+      !businessName?.trim() ||
+      !contactName?.trim() ||
+      !email?.trim() ||
+      !phone?.trim() ||
+      !merchantCategory
+    ) {
+      return res.status(400).json({
+        message:
+          "Business name, contact name, email, phone, and merchant category are required",
+      });
+    }
+
+    const emailError = validateEmail(email);
+    if (emailError) return res.status(400).json({ message: emailError });
+    const phoneError = validateMobilePhone(phone);
+    if (phoneError) return res.status(400).json({ message: phoneError });
+    if (!MERCHANT_INDUSTRY_VALUES.includes(merchantCategory)) {
+      return res.status(400).json({ message: "Invalid merchant category" });
+    }
+
+    const volume = Number(estimatedMonthlyVolume);
+    if (!Number.isFinite(volume) || volume <= 0) {
+      return res.status(400).json({
+        message: "Estimated monthly volume must be greater than zero",
+      });
+    }
+
+    const lead = await MerchantLead.create({
+      businessName: businessName.trim(),
+      contactName: contactName.trim(),
+      email: email.trim().toLowerCase(),
+      phone: getPhoneDigits(phone),
+      industry: merchantCategory,
+      merchantCategory,
+      estimatedMonthlyVolume: volume,
+      priority: null,
+      source: "merchant-portal",
+      userId: req.user._id,
+      formStep: 3,
+    });
+
+    await LeadActivity.create({
+      leadId: lead._id,
+      type: LEAD_ACTIVITY_TYPES.CREATED,
+      message: "Lead submitted from Merchant Panel",
+      actorId: req.user._id,
+      actorName: req.user.name || contactName.trim(),
+      actorRole: USER_ROLES.MERCHANT,
+      meta: {
+        source: "merchant-portal",
+        merchantCategory,
+        estimatedMonthlyVolume: volume,
+      },
+    });
+
+    return res.status(201).json({
+      message: "Lead submitted successfully",
+      lead: MerchantLead.sanitize({
+        ...lead,
+        accountStatus: req.user.status || "active",
+      }),
+    });
+  } catch (error) {
+    console.error("Merchant Panel lead submission error:", error);
+    return res.status(500).json({ message: "Failed to submit merchant lead" });
+  }
 }
 
 export async function getAllMerchantGateways(req, res) {
