@@ -7,7 +7,12 @@ import {
   sanitizeOnboardingPayload,
 } from "../utils/pgOnboarding.js";
 import { getSignedDownloadUrl } from "../services/s3Service.js";
-import { getPrimaryPgExpert, resolvePgExperts } from "../utils/pgExperts.js";
+import {
+  getActivePgExperts,
+  getAvailablePgExperts,
+  parseExpertAvailability,
+  resolvePgExperts,
+} from "../utils/pgExperts.js";
 
 const COLLECTION = "payment_providers";
 
@@ -228,7 +233,8 @@ export const PaymentProvider = {
       (onboarding.brandName || "").trim() ||
       (provider.companyName || "").trim() ||
       "Payment Gateway";
-    const expert = selectedExpert || getPrimaryPgExpert(provider);
+    const activeExperts = getAvailablePgExperts(provider);
+    const expert = selectedExpert || activeExperts[0] || getActivePgExperts(provider)[0] || null;
     const expertName = (expert?.name || onboarding.expertName || "").trim();
     let logoUrl = onboarding.companyLogo?.url || null;
     if (onboarding.companyLogo?.key) {
@@ -250,9 +256,16 @@ export const PaymentProvider = {
     ).trim() || null;
     const experts = resolvePgExperts(provider)
       .filter((item) => item.status !== "inactive")
+      .filter((item) => {
+        if (item.weeklyAvailability?.length) return true;
+        return Boolean(String(item.availabilitySlots || "").trim());
+      })
       .map((item) => ({
         ...item,
-        availableSlots: parseAvailabilitySlotLabels(item.availabilitySlots),
+        availableSlots: parseExpertAvailability(
+          item.availabilitySlots,
+          item.weeklyAvailability,
+        ),
       }));
 
     return {
@@ -269,7 +282,7 @@ export const PaymentProvider = {
       calendlyUrl,
       calendarSynced: Boolean(expert?.calendarSynced || onboarding.calendarSynced),
       availabilitySlots: availabilityRaw || null,
-      availableSlots: parseAvailabilitySlotLabels(availabilityRaw),
+      availableSlots: parseExpertAvailability(availabilityRaw, expert?.weeklyAvailability),
       rep: {
         name: expertName,
         title:

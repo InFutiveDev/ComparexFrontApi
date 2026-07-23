@@ -1,6 +1,7 @@
-import { REVIEW_IDENTITY_METHODS, REVIEW_STATUSES } from "../constants/reviewForm.js";
+import { REVIEW_IDENTITY_METHODS, REVIEW_STATUSES, REVIEW_TYPES, COMPAREX_WEBSITE_PRODUCT_ID } from "../constants/reviewForm.js";
 import { Review } from "../models/Review.js";
 import { PaymentProvider } from "../models/PaymentProvider.js";
+import { parseObjectId } from "../utils/objectId.js";
 import { validateEmail } from "../utils/validation.js";
 
 function toNumberOrZero(value) {
@@ -74,6 +75,7 @@ export async function submitReview(req, res) {
     const body = req.body || {};
     const {
       productId,
+      paymentProviderId,
       productName,
       productCompany,
       productCategory,
@@ -147,8 +149,21 @@ export async function submitReview(req, res) {
     const resolvedJobTitle =
       jobTitle === "Others" ? String(jobTitleOther || "").trim() || "Others" : jobTitle || "";
 
+    let linkedPaymentProviderId = null;
+    const providerObjectId =
+      parseObjectId(paymentProviderId) || parseObjectId(productId.trim());
+    if (providerObjectId) {
+      const provider = await PaymentProvider.findById(providerObjectId);
+      if (provider) {
+        linkedPaymentProviderId = provider._id;
+      }
+    }
+
     const review = await Review.create({
-      productId: productId.trim(),
+      paymentProviderId: linkedPaymentProviderId,
+      productId: linkedPaymentProviderId
+        ? linkedPaymentProviderId.toString()
+        : productId.trim(),
       productName: productName.trim(),
       productCompany: productCompany?.trim() || "",
       productCategory: productCategory?.trim() || "",
@@ -277,6 +292,71 @@ export async function submitMerchantReview(req, res) {
   } catch (error) {
     console.error("Submit merchant review error:", error);
     return res.status(500).json({ message: "Failed to submit merchant review" });
+  }
+}
+
+/** Public CompareX website feedback from Write a Review (admin-only visibility in Reviews). */
+export async function submitWebsiteReview(req, res) {
+  try {
+    const { name, email, rating, suggestionNotes, consentGenuine } = req.body;
+
+    if (!name?.trim()) {
+      return res.status(400).json({ message: "Name is required" });
+    }
+
+    if (!email?.trim()) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    const emailError = validateEmail(email);
+    if (emailError) {
+      return res.status(400).json({ message: emailError });
+    }
+
+    const overallRating = toNumberOrZero(rating);
+    if (overallRating < 1 || overallRating > 5) {
+      return res.status(400).json({ message: "Rating must be between 1 and 5" });
+    }
+
+    if (!suggestionNotes?.trim()) {
+      return res.status(400).json({ message: "Suggestion notes are required" });
+    }
+
+    if (!consentGenuine) {
+      return res.status(400).json({ message: "Please confirm your feedback is genuine" });
+    }
+
+    const review = await Review.create({
+      reviewType: REVIEW_TYPES.WEBSITE,
+      productId: COMPAREX_WEBSITE_PRODUCT_ID,
+      productName: "CompareX Website",
+      productCompany: "CompareX",
+      productCategory: "platform",
+      name: name.trim(),
+      businessName: "",
+      email: email.trim().toLowerCase(),
+      rating: overallRating,
+      title: "CompareX Website Feedback",
+      reviewText: suggestionNotes.trim(),
+      suggestionNotes: suggestionNotes.trim(),
+      status: "pending",
+      source: "write-a-review-website",
+      consents: {
+        genuine: Boolean(consentGenuine),
+        guidelines: true,
+        moderation: true,
+      },
+      ratings: {},
+    });
+
+    return res.status(201).json({
+      id: review._id.toString(),
+      message: "Thank you! Your CompareX website feedback has been submitted.",
+      review: Review.sanitize(review),
+    });
+  } catch (error) {
+    console.error("Submit website review error:", error);
+    return res.status(500).json({ message: "Failed to submit website feedback" });
   }
 }
 

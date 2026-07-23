@@ -37,14 +37,20 @@ export async function register(req, res) {
       return res.status(400).json({ message: "Password must be at least 6 characters" });
     }
 
+    const publicRegisterRoles = [
+      USER_ROLES.MERCHANT,
+      USER_ROLES.RESELLER,
+      USER_ROLES.PAYMENT_PROVIDER,
+    ];
     const resolvedRole =
       REGISTER_ACCOUNT_TYPE_TO_ROLE[accountType] ||
       REGISTER_ACCOUNT_TYPE_TO_ROLE[role] ||
       null;
 
-    if (!resolvedRole) {
+    if (!resolvedRole || !publicRegisterRoles.includes(resolvedRole)) {
       return res.status(400).json({
-        message: "Please select a valid account type (Merchant, Reseller, Payment Gateway, Admin, or Sub Admin)",
+        message:
+          "Please select a valid account type (Merchant, Reseller, or Payment Gateway). Admin users are created from the Master Admin dashboard.",
       });
     }
 
@@ -99,6 +105,12 @@ export async function login(req, res) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
+    if (user.status === "inactive") {
+      return res.status(403).json({
+        message: "Your account has been deactivated. Please contact an administrator.",
+      });
+    }
+
     if (!canLoginWithRole(user.role, expectedRole)) {
       return res.status(403).json({
         message: `This account is registered as ${formatRoleLabel(user.role)}. Please sign in using the ${formatRoleLabel(user.role)} tab.`,
@@ -133,6 +145,13 @@ export async function refresh(req, res) {
       return res.status(401).json({ message: "Invalid or expired refresh token" });
     }
 
+    if (user.status === "inactive") {
+      await RefreshToken.revoke(refreshToken);
+      return res.status(403).json({
+        message: "Your account has been deactivated. Please contact an administrator.",
+      });
+    }
+
     await RefreshToken.revoke(refreshToken);
     const tokens = await issueAuthTokens(user);
 
@@ -153,6 +172,12 @@ export async function me(req, res) {
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
+    }
+
+    if (user.status === "inactive") {
+      return res.status(403).json({
+        message: "Your account has been deactivated. Please contact an administrator.",
+      });
     }
 
     return res.json({ user: User.sanitize(user) });

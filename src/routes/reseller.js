@@ -13,13 +13,33 @@ import {
   updateResellerOnboardingDocuments,
   updateResellerVerificationStatus,
 } from "../controllers/resellerController.js";
-import { authMiddleware, requireAdmin } from "../middleware/auth.js";
+import {
+  getMyResellerLead,
+  listMyResellerLeads,
+} from "../controllers/resellerLeadController.js";
+import { listMyResellerGmv } from "../controllers/resellerGmvController.js";
+import {
+  getMyResellerCommissionSlabs,
+  listMyResellerCommissions,
+} from "../controllers/resellerCommissionController.js";
+import {
+  listMyResellerInvoices,
+  submitMyResellerInvoice,
+} from "../controllers/resellerInvoiceController.js";
+import { authMiddleware, requireAdmin, requireReseller } from "../middleware/auth.js";
 
 const router = Router();
 
 router.get("/form-options", getFormOptions);
 router.get("/me", authMiddleware, getMyResellerProfile);
 router.patch("/me", authMiddleware, updateMyResellerProfile);
+router.get("/me/leads", authMiddleware, requireReseller, listMyResellerLeads);
+router.get("/me/leads/:id", authMiddleware, requireReseller, getMyResellerLead);
+router.get("/me/gmv", authMiddleware, requireReseller, listMyResellerGmv);
+router.get("/me/commissions", authMiddleware, requireReseller, listMyResellerCommissions);
+router.get("/me/commission-slabs", authMiddleware, requireReseller, getMyResellerCommissionSlabs);
+router.get("/me/invoices", authMiddleware, requireReseller, listMyResellerInvoices);
+router.post("/me/invoices", authMiddleware, requireReseller, submitMyResellerInvoice);
 router.post("/admin", authMiddleware, requireAdmin, adminOnboardReseller);
 router.get("/", authMiddleware, getAllResellers);
 router.get("/:id", authMiddleware, getResellerById);

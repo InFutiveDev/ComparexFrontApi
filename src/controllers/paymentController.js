@@ -6,8 +6,15 @@ import {
 } from "../constants/paymentForm.js";
 import { PG_VERIFICATION_STATUSES } from "../constants/paymentOnboarding.js";
 import { PaymentProvider } from "../models/PaymentProvider.js";
+import { User } from "../models/User.js";
+import { USER_ROLES } from "../constants/userRoles.js";
+import { ensurePaymentProviderForUser } from "../services/provisionRoleProfile.js";
 import { createUserFromForm } from "../services/formUserAccount.js";
 import { enrichItemsWithAccountStatus, setUserAccountStatus } from "../services/accountStatus.js";
+import {
+  enrichSanitizedProviderWithRating,
+  enrichSanitizedProvidersWithRatings,
+} from "../services/pgRatings.js";
 import {
   computePgOnboardingCompletion,
   resolvePgVerificationStatus,
@@ -15,7 +22,7 @@ import {
 } from "../utils/pgOnboarding.js";
 import { getPhoneDigits, validateEmail, validateMobilePhone } from "../utils/validation.js";
 import {
-  getPrimaryPgExpert,
+  getActivePgExperts,
   normalizePgExperts,
   resolvePgExperts,
 } from "../utils/pgExperts.js";
@@ -114,9 +121,12 @@ export async function getAllPaymentGateways(req, res) {
     const { page, limit } = req.query;
     const result = await PaymentProvider.findAll({ page, limit });
     const enrichedItems = await enrichItemsWithAccountStatus(result.items);
+    const paymentGateways = await enrichSanitizedProvidersWithRatings(
+      enrichedItems.map(PaymentProvider.sanitize),
+    );
 
     return res.json({
-      paymentGateways: enrichedItems.map(PaymentProvider.sanitize),
+      paymentGateways,
       total: result.total,
       page: result.page,
       limit: result.limit,
@@ -136,9 +146,12 @@ export async function getPaymentGatewayById(req, res) {
     }
 
     const [enriched] = await enrichItemsWithAccountStatus([provider]);
+    const paymentGateway = await enrichSanitizedProviderWithRating(
+      PaymentProvider.sanitize(enriched),
+    );
 
     return res.json({
-      paymentGateway: PaymentProvider.sanitize(enriched),
+      paymentGateway,
     });
   } catch (error) {
     console.error("Get payment gateway error:", error);
@@ -148,16 +161,26 @@ export async function getPaymentGatewayById(req, res) {
 
 export async function getMyPaymentProfile(req, res) {
   try {
-    const provider = await PaymentProvider.findByUserId(req.userId);
+    let provider = await PaymentProvider.findByUserId(req.userId);
+
+    if (!provider) {
+      const user = await User.findById(req.userId);
+      if (user?.role === USER_ROLES.PAYMENT_PROVIDER) {
+        provider = await ensurePaymentProviderForUser(user, "admin");
+      }
+    }
 
     if (!provider) {
       return res.status(404).json({ message: "Payment gateway profile not found" });
     }
 
     const [enriched] = await enrichItemsWithAccountStatus([provider]);
+    const paymentGateway = await enrichSanitizedProviderWithRating(
+      PaymentProvider.sanitize(enriched),
+    );
 
     return res.json({
-      paymentGateway: PaymentProvider.sanitize(enriched),
+      paymentGateway,
     });
   } catch (error) {
     console.error("Get my payment profile error:", error);
@@ -232,22 +255,21 @@ export async function updateMyPgExperts(req, res) {
       }
     }
 
-    const primary = experts.find(
-      (expert) => expert.isPrimary && expert.status === "active",
-    );
+    const activeExperts = experts.filter((expert) => expert.status === "active");
+    const firstActive = activeExperts[0] || null;
     const nextOnboarding = sanitizeOnboardingPayload(
       {
         ...(provider.onboarding || {}),
         experts,
-        talkToExpertEnabled: Boolean(primary),
-        expertName: primary?.name || "",
-        expertDesignation: primary?.designation || "",
-        expertEmail: primary?.email || "",
-        expertMobile: primary?.mobile || "",
-        expertDescription: primary?.description || "",
-        calendlyUrl: primary?.calendlyUrl || "",
-        calendarSynced: Boolean(primary?.calendlyUrl || primary?.calendarSynced),
-        availabilitySlots: primary?.availabilitySlots || "",
+        talkToExpertEnabled: activeExperts.length > 0,
+        expertName: firstActive?.name || "",
+        expertDesignation: firstActive?.designation || "",
+        expertEmail: firstActive?.email || "",
+        expertMobile: firstActive?.mobile || "",
+        expertDescription: firstActive?.description || "",
+        calendlyUrl: firstActive?.calendlyUrl || "",
+        calendarSynced: Boolean(firstActive?.calendlyUrl || firstActive?.calendarSynced),
+        availabilitySlots: firstActive?.availabilitySlots || "",
       },
       { mergeWith: provider.onboarding || {} },
     );
@@ -261,7 +283,7 @@ export async function updateMyPgExperts(req, res) {
     return res.json({
       message: "Internal experts and Calendly availability updated successfully",
       experts: resolvePgExperts(result.updated),
-      primaryExpert: getPrimaryPgExpert(result.updated),
+      activeExperts: getActivePgExperts(result.updated),
     });
   } catch (error) {
     console.error("Update my PG experts error:", error);

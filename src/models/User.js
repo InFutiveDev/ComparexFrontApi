@@ -66,6 +66,55 @@ export const User = {
     return { updated: result.matchedCount > 0 };
   },
 
+  async findAll({ page = 1, limit = 50, role, status, search } = {}) {
+    const safePage = Math.max(1, Number(page) || 1);
+    const safeLimit = Math.min(100, Math.max(1, Number(limit) || 50));
+    const skip = (safePage - 1) * safeLimit;
+    const filter = {};
+
+    if (role) filter.role = role;
+    if (status) filter.status = status;
+
+    if (search?.trim()) {
+      const q = search.trim();
+      filter.$or = [
+        { name: { $regex: q, $options: "i" } },
+        { email: { $regex: q, $options: "i" } },
+      ];
+    }
+
+    const [items, total] = await Promise.all([
+      users().find(filter).sort({ createdAt: -1 }).skip(skip).limit(safeLimit).toArray(),
+      users().countDocuments(filter),
+    ]);
+
+    return { items, total, page: safePage, limit: safeLimit };
+  },
+
+  async updateById(id, data) {
+    const objectId = parseObjectId(id);
+    if (!objectId) {
+      return { invalid: true, updated: null };
+    }
+
+    const updates = {
+      ...data,
+      updatedAt: new Date(),
+    };
+
+    const result = await users().findOneAndUpdate(
+      { _id: objectId },
+      { $set: updates },
+      { returnDocument: "after" },
+    );
+
+    if (!result) {
+      return { invalid: false, updated: null };
+    }
+
+    return { invalid: false, updated: result };
+  },
+
   sanitize(user) {
     return {
       id: user._id.toString(),

@@ -20,6 +20,9 @@ import {
   RESELLER_YEARS_EXPERIENCE_VALUES,
 } from "../constants/resellerForm.js";
 import { ResellerPartner } from "../models/ResellerPartner.js";
+import { User } from "../models/User.js";
+import { ensureResellerPartnerForUser } from "../services/provisionRoleProfile.js";
+import { USER_ROLES } from "../constants/userRoles.js";
 import { createUserFromForm } from "../services/formUserAccount.js";
 import { enrichItemsWithAccountStatus, setUserAccountStatus } from "../services/accountStatus.js";
 import {
@@ -111,7 +114,14 @@ export async function getResellerById(req, res) {
 
 export async function getMyResellerProfile(req, res) {
   try {
-    const partner = await ResellerPartner.findByUserId(req.userId);
+    let partner = await ResellerPartner.findByUserId(req.userId);
+
+    if (!partner) {
+      const user = await User.findById(req.userId);
+      if (user?.role === USER_ROLES.RESELLER) {
+        partner = await ensureResellerPartnerForUser(user, "admin");
+      }
+    }
 
     if (!partner) {
       return res.status(404).json({ message: "Reseller profile not found" });
@@ -287,6 +297,11 @@ export async function updateMyResellerProfile(req, res) {
               "PAN, Aadhaar/Govt ID, bank details, and cancelled cheque / bank proof are required",
           });
         }
+
+        updates.kycSubmittedAt = new Date();
+        updates.kycVerificationProvider = "document_upload";
+        updates.panVerified = false;
+        updates.aadhaarVerified = false;
       }
     }
 
@@ -629,6 +644,8 @@ export async function updateResellerVerificationStatus(req, res) {
 
     const result = await ResellerPartner.updateById(partner._id, {
       verificationStatus: status,
+      panVerified: status === RESELLER_VERIFICATION_STATUSES.APPROVED,
+      aadhaarVerified: status === RESELLER_VERIFICATION_STATUSES.APPROVED,
     });
 
     if (!result.updated) {

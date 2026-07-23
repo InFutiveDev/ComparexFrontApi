@@ -59,6 +59,8 @@ export const MerchantLead = {
       assignedAt: null,
       assignedBy: null,
       registeredViaPgId: null,
+      registeredViaResellerId: null,
+      referredByResellerName: null,
       pgLeadStatus: PG_LEAD_STATUSES.PENDING,
       pgRemarks: null,
       pgStatusUpdatedAt: null,
@@ -160,6 +162,59 @@ export const MerchantLead = {
     return { items, total, page: safePage, limit: safeLimit };
   },
 
+  async findAllForReseller(
+    resellerId,
+    { page = 1, limit = 50, leadStatus, search, exportAll = false } = {},
+  ) {
+    const objectId = parseObjectId(resellerId);
+    if (!objectId) return { items: [], total: 0, page: 1, limit: Number(limit) || 50 };
+
+    const safePage = Math.max(1, Number(page) || 1);
+    const safeLimit = exportAll
+      ? 10000
+      : Math.min(100, Math.max(1, Number(limit) || 50));
+    const skip = exportAll ? 0 : (safePage - 1) * safeLimit;
+    const filter = {
+      registeredViaResellerId: objectId,
+    };
+
+    if (leadStatus) {
+      filter.leadStatus = leadStatus;
+    }
+
+    if (search?.trim()) {
+      const q = search.trim();
+      filter.$or = [
+        { businessName: { $regex: q, $options: "i" } },
+        { email: { $regex: q, $options: "i" } },
+        { phone: { $regex: q, $options: "i" } },
+      ];
+    }
+
+    const [items, total] = await Promise.all([
+      leads()
+        .find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(safeLimit)
+        .toArray(),
+      leads().countDocuments(filter),
+    ]);
+
+    return { items, total, page: safePage, limit: safeLimit };
+  },
+
+  async findByIdForReseller(id, resellerId) {
+    const leadId = parseObjectId(id);
+    const partnerId = parseObjectId(resellerId);
+    if (!leadId || !partnerId) return null;
+
+    return leads().findOne({
+      _id: leadId,
+      registeredViaResellerId: partnerId,
+    });
+  },
+
   async findByIdForPg(id, pgId) {
     const leadId = parseObjectId(id);
     const providerId = parseObjectId(pgId);
@@ -236,6 +291,8 @@ export const MerchantLead = {
       assignedAt: lead.assignedAt ?? null,
       assignedBy: lead.assignedBy?.toString() ?? null,
       registeredViaPgId: lead.registeredViaPgId?.toString?.() ?? null,
+      registeredViaResellerId: lead.registeredViaResellerId?.toString?.() ?? null,
+      referredByResellerName: lead.referredByResellerName ?? null,
       pgLeadStatus: lead.pgLeadStatus ?? PG_LEAD_STATUSES.PENDING,
       pgRemarks: lead.pgRemarks ?? null,
       pgStatusUpdatedAt: lead.pgStatusUpdatedAt ?? null,

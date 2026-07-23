@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { adminMdrRouter } from "./adminMdr.js";
 import { adminSettingsRouter } from "./adminSettings.js";
+import { adminUsersRouter } from "./adminUsers.js";
 import { authRouter } from "./auth.js";
 import { expertRouter } from "./expert.js";
 import { merchantRouter } from "./merchant.js";
@@ -22,6 +23,7 @@ router.get("/", (_req, res) => {
 
 router.use("/auth", authRouter);
 router.use("/admin/settings", adminSettingsRouter);
+router.use("/admin/users", adminUsersRouter);
 router.use("/admin/mdr", adminMdrRouter);
 router.use("/merchant", merchantRouter);
 router.use("/notifications", notificationRouter);

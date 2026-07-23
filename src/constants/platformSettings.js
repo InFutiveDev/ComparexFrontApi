@@ -35,7 +35,7 @@ export const PLATFORM_PERMISSIONS = [
   { key: "reports:read", label: "View reports" },
   { key: "settings:read", label: "View system settings" },
   { key: "settings:write", label: "Edit system settings" },
-  { key: "users:manage", label: "Manage user access rights" },
+  { key: "users:manage", label: "Manage users & assign roles" },
   { key: "payouts:manage", label: "Manage payout rules" },
 ];
 

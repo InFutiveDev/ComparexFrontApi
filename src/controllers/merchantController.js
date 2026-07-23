@@ -7,10 +7,19 @@ import {
 import { USER_ROLES } from "../constants/userRoles.js";
 import { MerchantLead } from "../models/MerchantLead.js";
 import { PaymentProvider } from "../models/PaymentProvider.js";
+import { ResellerPartner } from "../models/ResellerPartner.js";
 import { LeadActivity } from "../models/LeadActivity.js";
 import { LEAD_ACTIVITY_TYPES } from "../constants/leadWorkflow.js";
 import { enrichItemsWithAccountStatus, setUserAccountStatus } from "../services/accountStatus.js";
 import { getPhoneDigits, validateEmail, validateMobilePhone } from "../utils/validation.js";
+import {
+  appendAffiliateUpdates,
+  buildAffiliateLeadFields,
+  getResellerDisplayName,
+  resolveAffiliateIds,
+  resolveAffiliatePartners,
+  resolveLeadSource,
+} from "../utils/affiliateFromRequest.js";
 
 export function getFormOptions(_req, res) {
   return res.json({
@@ -176,7 +185,8 @@ export async function deleteMerchantGateway(req, res) {
 
 export async function submitMerchantForm(req, res) {
   try {
-    const { businessName, email, phone, pgId } = req.body;
+    const { businessName, email, phone } = req.body;
+    const { pgId, resellerId } = resolveAffiliateIds(req);
 
     if (!businessName?.trim() || !email?.trim() || !phone?.trim()) {
       return res.status(400).json({
@@ -194,42 +204,49 @@ export async function submitMerchantForm(req, res) {
       return res.status(400).json({ message: phoneError });
     }
 
-    let affiliateProvider = null;
-    if (pgId) {
-      affiliateProvider = await PaymentProvider.findById(pgId);
-      if (!affiliateProvider) {
-        return res.status(400).json({ message: "Invalid payment gateway affiliate link" });
-      }
+    const { affiliateProvider, affiliateReseller } = await resolveAffiliatePartners(
+      { pgId, resellerId },
+      { PaymentProvider, ResellerPartner },
+    );
+
+    if (pgId && !affiliateProvider) {
+      return res.status(400).json({ message: "Invalid payment gateway affiliate link" });
     }
 
-    const now = new Date();
+    if (resellerId && !affiliateReseller) {
+      return res.status(400).json({ message: "Invalid reseller referral link" });
+    }
+
+    const source = resolveLeadSource(affiliateProvider, affiliateReseller);
+    const resellerDisplayName = getResellerDisplayName(affiliateReseller);
+    const affiliateFields = buildAffiliateLeadFields(affiliateProvider, affiliateReseller);
+
     const lead = await MerchantLead.create({
       businessName: businessName.trim(),
       email: email.trim().toLowerCase(),
       phone: getPhoneDigits(phone),
       industry: null,
       priority: null,
-      source: affiliateProvider ? "pg-affiliate" : "merchant",
       userId: null,
       formStep: 1,
-      registeredViaPgId: affiliateProvider?._id ?? null,
-      assignedPgId: affiliateProvider?._id ?? null,
-      assignedPgName: affiliateProvider?.companyName ?? null,
-      assignedAt: affiliateProvider ? now : null,
+      ...affiliateFields,
     });
 
     await LeadActivity.create({
       leadId: lead._id,
       type: LEAD_ACTIVITY_TYPES.CREATED,
-      message: affiliateProvider
-        ? `Merchant lead registered via ${affiliateProvider.companyName} affiliate link`
-        : "Merchant lead submitted",
+      message: affiliateReseller
+        ? `Merchant lead registered via ${resellerDisplayName} referral link`
+        : affiliateProvider
+          ? `Merchant lead registered via ${affiliateProvider.companyName} affiliate link`
+          : "Merchant lead submitted",
       actorName: businessName.trim(),
       actorRole: "merchant",
       meta: {
-        source: affiliateProvider ? "pg-affiliate" : "merchant",
+        source,
         formStep: 1,
         paymentProviderId: affiliateProvider?._id?.toString() ?? null,
+        resellerId: affiliateReseller?._id?.toString() ?? null,
       },
     });
 
@@ -261,6 +278,7 @@ export async function updateMerchantForm(req, res) {
     const priority = req.body.priority ?? req.body.business;
     const updates = {};
     const formStep = Number(step);
+    const { pgId, resellerId } = resolveAffiliateIds(req);
 
     if (formStep === 1) {
       if (!businessName?.trim() || !email?.trim() || !phone?.trim()) {
@@ -303,6 +321,23 @@ export async function updateMerchantForm(req, res) {
       updates.formStep = 3;
     } else {
       return res.status(400).json({ message: "A valid form step is required" });
+    }
+
+    if (pgId || resellerId) {
+      const { affiliateProvider, affiliateReseller } = await resolveAffiliatePartners(
+        { pgId, resellerId },
+        { PaymentProvider, ResellerPartner },
+      );
+
+      if (pgId && !affiliateProvider) {
+        return res.status(400).json({ message: "Invalid payment gateway affiliate link" });
+      }
+
+      if (resellerId && !affiliateReseller) {
+        return res.status(400).json({ message: "Invalid reseller referral link" });
+      }
+
+      appendAffiliateUpdates(lead, affiliateProvider, affiliateReseller, updates);
     }
 
     if (Object.keys(updates).length === 0) {

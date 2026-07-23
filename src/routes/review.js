@@ -4,6 +4,7 @@ import {
   getAllReviews,
   getReviewById,
   submitReview,
+  submitWebsiteReview,
   submitMerchantReview,
   updateReviewStatus,
 } from "../controllers/reviewController.js";
@@ -16,6 +17,7 @@ import {
 const router = Router();
 
 router.post("/", submitReview);
+router.post("/website", submitWebsiteReview);
 router.post("/merchant", authMiddleware, requireMerchant, submitMerchantReview);
 router.get("/", authMiddleware, requireAdmin, getAllReviews);
 router.get("/:id", authMiddleware, requireAdmin, getReviewById);

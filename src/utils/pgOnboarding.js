@@ -48,6 +48,8 @@ export function emptyPgOnboarding() {
           "sdkAvailability",
           "pluginAvailability",
           "mobileSdkSupport",
+          "merchantSuccessStoriesUrls",
+          "caseStudiesUrls",
         ].includes(key)
       ) {
         return [key, []];
@@ -111,6 +113,17 @@ export function sanitizeOnboardingPayload(input = {}, { mergeWith = null } = {})
 
   if (next.serviceType && !PG_SERVICE_TYPE_VALUES.includes(next.serviceType)) {
     next.serviceType = "";
+  }
+
+  if (
+    !next.merchantSuccessStoriesUrls.length &&
+    hasText(input.merchantSuccessStoriesUrl)
+  ) {
+    next.merchantSuccessStoriesUrls = [String(input.merchantSuccessStoriesUrl).trim()];
+  }
+
+  if (!next.caseStudiesUrls.length && hasText(input.caseStudiesUrl)) {
+    next.caseStudiesUrls = [String(input.caseStudiesUrl).trim()];
   }
 
   return next;

@@ -45,6 +45,7 @@ export const Review = {
           $match: {
             status: "published",
             rating: { $gte: 1, $lte: 5 },
+            reviewType: { $ne: "comparex_website" },
           },
         },
         { $sort: { createdAt: -1 } },
@@ -104,6 +105,83 @@ export const Review = {
         },
       ])
       .toArray();
+  },
+
+  async getRatingSummariesByProviderIds(providerIds = []) {
+    const objectIds = providerIds.map((id) => parseObjectId(id)).filter(Boolean);
+    const idStrings = objectIds.map((id) => id.toString());
+
+    if (!objectIds.length) {
+      return new Map();
+    }
+
+    const rows = await reviews()
+      .aggregate([
+        {
+          $match: {
+            status: "published",
+            rating: { $gte: 1, $lte: 5 },
+            reviewType: { $ne: "comparex_website" },
+            $or: [
+              { paymentProviderId: { $in: objectIds } },
+              { productId: { $in: idStrings } },
+            ],
+          },
+        },
+        { $sort: { createdAt: -1 } },
+        {
+          $addFields: {
+            providerKey: {
+              $toLower: {
+                $toString: { $ifNull: ["$paymentProviderId", "$productId"] },
+              },
+            },
+          },
+        },
+        {
+          $group: {
+            _id: "$providerKey",
+            average: { $avg: "$rating" },
+            count: { $sum: 1 },
+            reviews: {
+              $push: {
+                id: { $toString: "$_id" },
+                title: "$title",
+                reviewText: "$reviewText",
+                reviewerName: "$name",
+                rating: "$rating",
+                createdAt: "$createdAt",
+              },
+            },
+          },
+        },
+        {
+          $project: {
+            _id: 1,
+            average: { $round: ["$average", 1] },
+            count: 1,
+            reviews: { $slice: ["$reviews", 3] },
+          },
+        },
+      ])
+      .toArray();
+
+    return new Map(
+      rows.map((row) => [
+        String(row._id || "").toLowerCase(),
+        {
+          average: Number(row.average || 0),
+          count: Number(row.count || 0),
+          reviews: Array.isArray(row.reviews) ? row.reviews : [],
+        },
+      ]),
+    );
+  },
+
+  async getRatingSummaryForProvider(providerId) {
+    const map = await this.getRatingSummariesByProviderIds([providerId]);
+    const key = String(providerId || "").toLowerCase();
+    return map.get(key) || { average: 0, count: 0, reviews: [] };
   },
 
   findById(id) {
@@ -168,6 +246,13 @@ export const Review = {
       ratings: review.ratings ?? {},
       title: review.title,
       reviewText: review.reviewText,
+      suggestionNotes: review.suggestionNotes || review.reviewText || "",
+      reviewTypeLabel:
+        review.reviewType === "comparex_website"
+          ? "CompareX Website"
+          : review.reviewType === "pg_and_platform_review"
+            ? "PG + Platform"
+            : "Payment Gateway",
       stoodOut: review.stoodOut ?? [],
       idealFor: review.idealFor ?? [],
       onboardingExperience: review.onboardingExperience || "",

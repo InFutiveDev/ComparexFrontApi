@@ -5,6 +5,10 @@ import {
   resolveVerificationStatus,
 } from "../utils/resellerProfile.js";
 import { RESELLER_VERIFICATION_STATUSES } from "../constants/resellerForm.js";
+import {
+  KYC_DISPLAY_STATUS_LABELS,
+  mapVerificationToKycStatus,
+} from "../constants/resellerFinance.js";
 
 const COLLECTION = "reseller_partners";
 
@@ -142,6 +146,18 @@ export const ResellerPartner = {
       resellerAgreement: Boolean(partner.resellerAgreement),
       commissionPolicy: Boolean(partner.commissionPolicy),
       verificationStatus,
+      kycStatus: mapVerificationToKycStatus(verificationStatus),
+      kycStatusLabel: KYC_DISPLAY_STATUS_LABELS[mapVerificationToKycStatus(verificationStatus)],
+      panVerified: Boolean(
+        partner.panVerified ??
+          (verificationStatus === RESELLER_VERIFICATION_STATUSES.APPROVED && partner.panCard),
+      ),
+      aadhaarVerified: Boolean(
+        partner.aadhaarVerified ??
+          (verificationStatus === RESELLER_VERIFICATION_STATUSES.APPROVED && partner.aadhaarId),
+      ),
+      kycVerificationProvider: partner.kycVerificationProvider ?? "document_upload",
+      kycSubmittedAt: partner.kycSubmittedAt ?? null,
       profileCompletionPercent: profileCompletion.percent,
       profileCompletion,
       formStep: partner.formStep ?? 1,
